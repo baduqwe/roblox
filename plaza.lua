@@ -24,7 +24,6 @@ if not LocalPlayer.Character then
 end
 local HumanoidRootPart = LocalPlayer.Character.HumanoidRootPart
 
---// GLOBAL
 local NLibrary = ReplicatedStorage.Library
 local PlayerSave = require(NLibrary.Client.Save) 
 local TradingPlazaCmds = require(NLibrary.Client.TradingPlazaCmds)
@@ -35,7 +34,6 @@ local Directory = require(NLibrary.Directory)
 local PlayerScripts = LocalPlayer.PlayerScripts.Scripts
 local Rarities = table.clone(require(NLibrary.Directory.Rarity))
 local Mailbox = require(NLibrary.Types.Mailbox)
---// PS99
 if table.find({PS99.Normal, PS99.Pro}, game.PlaceId) then
     if #TradingPlazaCmds.GetAvailable() > 1 then
         CanUsePro = true
@@ -43,8 +41,6 @@ if table.find({PS99.Normal, PS99.Pro}, game.PlaceId) then
     Constants = require(NLibrary.Balancing.Constants)
 end
 
-
---// PETS GO
 if table.find({PETSGO.Normal, PETSGO.Pro}, game.PlaceId) then
     UpgradeCmds = require(NLibrary.Client.UpgradeCmds)
     Variables = require(NLibrary.Shared.Variables)
