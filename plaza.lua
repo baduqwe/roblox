@@ -24,6 +24,7 @@ if not LocalPlayer.Character then
 end
 local HumanoidRootPart = LocalPlayer.Character.HumanoidRootPart
 
+--// GLOBAL
 local NLibrary = ReplicatedStorage.Library
 local PlayerSave = require(NLibrary.Client.Save) 
 local TradingPlazaCmds = require(NLibrary.Client.TradingPlazaCmds)
@@ -34,6 +35,7 @@ local Directory = require(NLibrary.Directory)
 local PlayerScripts = LocalPlayer.PlayerScripts.Scripts
 local Rarities = table.clone(require(NLibrary.Directory.Rarity))
 local Mailbox = require(NLibrary.Types.Mailbox)
+--// PS99
 if table.find({PS99.Normal, PS99.Pro}, game.PlaceId) then
     if #TradingPlazaCmds.GetAvailable() > 1 then
         CanUsePro = true
@@ -41,6 +43,8 @@ if table.find({PS99.Normal, PS99.Pro}, game.PlaceId) then
     Constants = require(NLibrary.Balancing.Constants)
 end
 
+
+--// PETS GO
 if table.find({PETSGO.Normal, PETSGO.Pro}, game.PlaceId) then
     UpgradeCmds = require(NLibrary.Client.UpgradeCmds)
     Variables = require(NLibrary.Shared.Variables)
@@ -934,6 +938,20 @@ local function SniperNotification(CurrentInfo, FindInfo, Percent)
 	})
 end
 
+local function GetTotalHuges()
+    local Total = 0
+    local Inventory = GetInventoryByClass("Pet")
+    if not Inventory or not Inventory._byUID then
+        return 0
+    end
+    for _, ItemTable in pairs(Inventory._byUID) do
+        if ItemTable.IsHuge and ItemTable:IsHuge() then
+            Total = Total + (ItemTable._data and ItemTable._data["_am"] or 1)
+        end
+    end
+    return Total
+end
+
 local function SellerNotification(CurrentInfo)
     local BoothCount, ItemCount = FindItemsInBooth(CurrentInfo.ID, CurrentInfo.Class)
     local Description = {
@@ -941,6 +959,7 @@ local function SellerNotification(CurrentInfo)
         "**<:Diamond:1235403834969296896> Gained:** `"..AddSuffix(CurrentInfo.Spent)..(CurrentInfo.Amount > 1 and " ("..AddSuffix(CurrentInfo.Spent / CurrentInfo.Amount).." per)`" or "`"),
         "**<:Booth:1239350605294604378> Booth Count:** `"..AddCommas(ItemCount).."`",
         "**<:Bank:1295944894698754102> Current Diamonds:** `"..AddSuffix(GetDiamonds()).."`",
+        "**<:Misc:1236020543082463253> Total Huges:** `"..AddCommas(GetTotalHuges()).."`",
     }
 
     local Message = {
@@ -965,9 +984,15 @@ local function SellerNotification(CurrentInfo)
 	local thing = request({
 		Url = UI["URL"],
 		Method = "POST",
-		Headers = {["Content-Type"] = "application/json"}, 
+		Headers = {["Content-Type"] = "application/json", ["User-Agent"] = "PlazaPlus"},
 		Body = HttpService:JSONEncode(Message)
 	})
+	if type(thing) == "table" then
+		local code = thing.StatusCode or thing.status_code or thing.Status or thing.status
+		print("[Plaza Plus]: Webhook -> Status:", code, "| Body:", tostring(thing.Body or thing.body))
+	else
+		warn("[Plaza Plus]: Webhook -> 'request' cevap dondurmedi. URL dogru mu? ->", tostring(UI["URL"]))
+	end
 end
 
 local TempRAP = {}
