@@ -1117,39 +1117,28 @@ task.spawn(function()
         local bottomLabel = label(row(10, 22), "💎 —   •   FPS —   •   ⏱ 00:00", 15, THEME.sub, Enum.Font.GothamMedium)
         label(row(11, 18), "[ Right Shift ] ekrani gizle / goster", 12, THEME.sub, Enum.Font.Gotham)
 
-        -- ALT SLIM KONSOL
-        local consoleWrap = mk("Frame", { Name = "Console", AnchorPoint = Vector2.new(0.5, 1),
-            Position = UDim2.new(0.5, 0, 1, -16), Size = UDim2.fromOffset(620, 120),
-            BackgroundColor3 = THEME.panel, BackgroundTransparency = 0.35, BorderSizePixel = 0 }, cover)
-        mk("UICorner", { CornerRadius = UDim.new(0, 10) }, consoleWrap)
-        mk("UIStroke", { Thickness = 1, Color = THEME.accentA, Transparency = 0.6 }, consoleWrap)
-        local logScroll = mk("ScrollingFrame", { Position = UDim2.fromOffset(10, 8), Size = UDim2.new(1, -20, 1, -16),
-            BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 2, ScrollBarImageColor3 = THEME.accentA,
-            CanvasSize = UDim2.new(0,0,0,0), AutomaticCanvasSize = Enum.AutomaticSize.Y,
-            ScrollingDirection = Enum.ScrollingDirection.Y }, consoleWrap)
-        local logLayout = mk("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 1) }, logScroll)
-
-        local lines = {}
-        local function colorFor(mt)
-            if mt == Enum.MessageType.MessageWarning then return THEME.warnC end
-            if mt == Enum.MessageType.MessageError then return THEME.errC end
-            return THEME.text
+        -- log -> "Hazirlaniyor" satirini canli aksiyon ile guncelle (konsol kutusu yok)
+        local function pretty(t)
+            t = tostring(t)
+            if t:find("Booth was claimed") then return "✅ Booth alindi, listeleniyor..." end
+            local listing = t:match("Attempting to list:%s*(.-)%s*%(")
+            if listing then return "📦 Booth'a koyuluyor: " .. listing end
+            if t:find("Added item") then
+                local added = t:match("Added item:%s*(.-)%s*x%d")
+                return "📥 Eklendi: " .. (added or "")
+            end
+            if t:find("FAILED to add item") then return "⚠️ Eklenemedi, tekrar deneniyor..." end
+            if t:find("was sold") then return "💰 Satildi!" end
+            local sniping = t:match("Sniping:%s*(.+)")
+            if sniping then return "🎯 Snipe: " .. sniping end
+            local generic = t:match("%[Plaza Plus%]:%s*(.+)")
+            if generic then return "📋 " .. generic:sub(1, 70) end
+            return nil
         end
-        local function pushLine(text, color)
-            local lbl = mk("TextLabel", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-                BackgroundTransparency = 1, Font = Enum.Font.Code, Text = text, TextSize = 12, TextColor3 = color,
-                TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
-                TextWrapped = true, LayoutOrder = #lines + 1 }, logScroll)
-            table.insert(lines, lbl)
-            if #lines > MAX_LOG_LINES then local o = table.remove(lines, 1) if o then o:Destroy() end end
-            task.defer(function() logScroll.CanvasPosition = Vector2.new(0, logLayout.AbsoluteContentSize.Y) end)
-        end
-        LogService.MessageOut:Connect(function(text, mt)
-            pushLine(text, colorFor(mt))
-            local short = text:gsub("%[Plaza Plus%]:%s*", ""):gsub("%[badu%]%s*", "")
-            statusLabel.Text = "📋 " .. short:sub(1, 80)
+        LogService.MessageOut:Connect(function(text)
+            local p = pretty(text)
+            if p then statusLabel.Text = p end
         end)
-        pushLine("[badu] Overlay baslatildi.", THEME.accentB)
 
         -- fps (Heartbeat -> 3D kapaliyken de calisir)
         local fps = 60
@@ -1158,10 +1147,9 @@ task.spawn(function()
         end)
         local startT = os.time()
 
-        -- optimizasyon: 3D render kapat + kalite/isik dusur
+        -- optimizasyon: kalite + isik (3D render KAPATILMIYOR -> scheduler donma riski yok)
         local sv = {}
         local function setOptimize(on)
-            pcall(function() RunService:Set3dRenderingEnabled(not on) end)
             pcall(function()
                 if on then sv.q = sv.q or settings().Rendering.QualityLevel; settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
                 elseif sv.q then settings().Rendering.QualityLevel = sv.q end
@@ -1191,11 +1179,13 @@ task.spawn(function()
         -- guncelleme: fps / uptime / diamonds
         task.spawn(function()
             while screen.Parent do
-                local s = os.time() - startT
-                local dia = "—"
-                pcall(function() dia = AddSuffix(GetDiamonds()) end)
-                bottomLabel.Text = string.format("💎 %s   •   FPS %d   •   ⏱ %02d:%02d",
-                    tostring(dia), math.floor(fps + 0.5), math.floor(s / 60), s % 60)
+                pcall(function()
+                    local s = os.time() - startT
+                    local dia = "—"
+                    pcall(function() dia = AddSuffix(GetDiamonds()) end)
+                    bottomLabel.Text = string.format("💎 %s   •   FPS %d   •   ⏱ %02d:%02d",
+                        tostring(dia), math.floor(fps + 0.5), math.floor(s / 60), s % 60)
+                end)
                 task.wait(0.5)
             end
         end)
@@ -1203,16 +1193,18 @@ task.spawn(function()
         task.spawn(function()
             local cN, cG, cR, cS = hex(THEME.text), hex(THEME.gold), hex(THEME.accentB), hex(THEME.accentA)
             while screen.Parent do
-                local r = hugeStats()
-                hugeLabel.Text = "Total Huge:  <b>" .. commas(r.total) .. "</b>"
-                v1Label.Text = string.format(
-                    "<font color='%s'>Normal</font> / <font color='%s'>Golden</font> / <font color='%s'>Rainbow</font>:   "..
-                    "<font color='%s'>%s</font> / <font color='%s'>%s</font> / <font color='%s'>%s</font>",
-                    cN, cG, cR, cN, commas(r.normal), cG, commas(r.golden), cR, commas(r.rainbow))
-                v2Label.Text = string.format(
-                    "<font color='%s'>Shiny</font> / <font color='%s'>Shiny Golden</font> / <font color='%s'>Shiny Rainbow</font>:   "..
-                    "<font color='%s'>%s</font> / <font color='%s'>%s</font> / <font color='%s'>%s</font>",
-                    cS, cG, cR, cS, commas(r.shiny), cG, commas(r.sg), cR, commas(r.sr))
+                pcall(function()
+                    local r = hugeStats()
+                    hugeLabel.Text = "Total Huge:  <b>" .. commas(r.total) .. "</b>"
+                    v1Label.Text = string.format(
+                        "<font color='%s'>Normal</font> / <font color='%s'>Golden</font> / <font color='%s'>Rainbow</font>:   "..
+                        "<font color='%s'>%s</font> / <font color='%s'>%s</font> / <font color='%s'>%s</font>",
+                        cN, cG, cR, cN, commas(r.normal), cG, commas(r.golden), cR, commas(r.rainbow))
+                    v2Label.Text = string.format(
+                        "<font color='%s'>Shiny</font> / <font color='%s'>Shiny Golden</font> / <font color='%s'>Shiny Rainbow</font>:   "..
+                        "<font color='%s'>%s</font> / <font color='%s'>%s</font> / <font color='%s'>%s</font>",
+                        cS, cG, cR, cS, commas(r.shiny), cG, commas(r.sg), cR, commas(r.sr))
+                end)
                 task.wait(2)
             end
         end)
