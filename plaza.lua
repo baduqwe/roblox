@@ -995,6 +995,278 @@ local function SellerNotification(CurrentInfo)
 	end
 end
 
+--==================================================
+-- badu | Plaza HUD  (entegre overlay - plazajxnt icinde calisir)
+--==================================================
+task.spawn(function()
+    -- capability hatasi (Instance erisemiyor) icin thread yetkisini yukseltmeyi dene
+    pcall(function()
+        local elevate = setthreadidentity or setidentity or setthreadcontext or (syn and syn.set_thread_identity)
+        if elevate then elevate(8) end
+    end)
+
+    local UserInputService = game:GetService("UserInputService")
+    local Lighting = game:GetService("Lighting")
+
+    local THEME = {
+        bg = Color3.fromRGB(15,14,21), bg2 = Color3.fromRGB(23,21,32), stroke = Color3.fromRGB(48,44,66),
+        accentA = Color3.fromRGB(176,124,255), accentB = Color3.fromRGB(72,222,250), gold = Color3.fromRGB(232,214,124),
+        text = Color3.fromRGB(236,236,246), sub = Color3.fromRGB(150,148,170),
+        warnC = Color3.fromRGB(232,214,124), errC = Color3.fromRGB(235,96,96),
+    }
+    local MAX_LOG_LINES = 120
+    local BOOST_DEFAULT  = true
+
+    local function mk(class, props, parent)
+        local i = Instance.new(class)
+        for k, v in pairs(props or {}) do if k ~= "Parent" then i[k] = v end end
+        if parent then i.Parent = parent end
+        return i
+    end
+    local function commas(n)
+        local s = tostring(math.floor(n or 0)); local k
+        repeat s, k = s:gsub("^(-?%d+)(%d%d%d)", "%1,%2") until k == 0
+        return s
+    end
+    local function getParent()
+        local a, b = pcall(function() return gethui() end)
+        if a and b then return b end
+        local c, d = pcall(function() return game:GetService("CoreGui") end)
+        if c and d then return d end
+        return LocalPlayer:WaitForChild("PlayerGui")
+    end
+
+    local ok, err = pcall(function()
+        pcall(function()
+            local old = getParent():FindFirstChild("baduPlazaHUD")
+            if old then old:Destroy() end
+        end)
+
+        local screen = mk("ScreenGui", {
+            Name = "baduPlazaHUD", ResetOnSpawn = false,
+            ZIndexBehavior = Enum.ZIndexBehavior.Sibling, IgnoreGuiInset = true, DisplayOrder = 9999,
+        }, getParent())
+
+        local main = mk("Frame", {
+            Name = "Main", Size = UDim2.fromOffset(340, 430), Position = UDim2.fromOffset(40, 120),
+            BackgroundColor3 = THEME.bg, BackgroundTransparency = 0.05, BorderSizePixel = 0,
+        }, screen)
+        mk("UICorner", { CornerRadius = UDim.new(0, 14) }, main)
+        local mainStroke = mk("UIStroke", { Thickness = 1.4, Color = THEME.stroke, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, main)
+        mk("UIGradient", { Rotation = 35, Color = ColorSequence.new(THEME.accentA, THEME.accentB) }, mainStroke)
+
+        local header = mk("Frame", {
+            Name = "Header", Size = UDim2.new(1, 0, 0, 46),
+            BackgroundColor3 = THEME.bg2, BackgroundTransparency = 0.2, BorderSizePixel = 0,
+        }, main)
+        mk("UICorner", { CornerRadius = UDim.new(0, 14) }, header)
+        mk("Frame", { Size = UDim2.new(1, 0, 0, 14), Position = UDim2.new(0, 0, 1, -14),
+            BackgroundColor3 = THEME.bg2, BackgroundTransparency = 0.2, BorderSizePixel = 0 }, header)
+
+        local dot = mk("Frame", { Size = UDim2.fromOffset(10, 10), Position = UDim2.fromOffset(16, 18),
+            BackgroundColor3 = THEME.accentB, BorderSizePixel = 0 }, header)
+        mk("UICorner", { CornerRadius = UDim.new(1, 0) }, dot)
+
+        local title = mk("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(34, 8),
+            Size = UDim2.fromOffset(120, 18), Font = Enum.Font.GothamBlack, Text = "badu", TextSize = 17,
+            TextColor3 = THEME.text, TextXAlignment = Enum.TextXAlignment.Left }, header)
+        mk("UIGradient", { Color = ColorSequence.new(THEME.accentA, THEME.accentB) }, title)
+        mk("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(34, 25),
+            Size = UDim2.fromOffset(160, 14), Font = Enum.Font.GothamMedium, Text = "PLAZA HUD", TextSize = 11,
+            TextColor3 = THEME.sub, TextXAlignment = Enum.TextXAlignment.Left }, header)
+
+        local minBtn = mk("TextButton", { Size = UDim2.fromOffset(28, 28), Position = UDim2.new(1, -38, 0, 9),
+            BackgroundColor3 = THEME.bg, Text = "—", Font = Enum.Font.GothamBold, TextSize = 16,
+            TextColor3 = THEME.sub, AutoButtonColor = true, BorderSizePixel = 0 }, header)
+        mk("UICorner", { CornerRadius = UDim.new(0, 8) }, minBtn)
+
+        local statsRow = mk("Frame", { Name = "Stats", BackgroundTransparency = 1,
+            Position = UDim2.fromOffset(12, 56), Size = UDim2.new(1, -24, 0, 78) }, main)
+        mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal,
+            HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center,
+            Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, statsRow)
+
+        local function makeStat(order, label, accent, wide)
+            local card = mk("Frame", { LayoutOrder = order,
+                Size = wide and UDim2.fromOffset(150, 74) or UDim2.fromOffset(78, 74),
+                BackgroundColor3 = THEME.bg2, BackgroundTransparency = 0.15, BorderSizePixel = 0 }, statsRow)
+            mk("UICorner", { CornerRadius = UDim.new(0, 10) }, card)
+            mk("UIStroke", { Thickness = 1, Color = THEME.stroke, Transparency = 0.3 }, card)
+            local bar = mk("Frame", { Size = UDim2.new(1, -20, 0, 2), Position = UDim2.new(0, 10, 0, 10),
+                BackgroundColor3 = accent, BorderSizePixel = 0 }, card)
+            mk("UICorner", { CornerRadius = UDim.new(1, 0) }, bar)
+            local value = mk("TextLabel", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 20),
+                Size = UDim2.new(1, 0, 0, 30), Font = Enum.Font.GothamBlack, Text = "—",
+                TextSize = wide and 26 or 20, TextColor3 = THEME.text }, card)
+            mk("TextLabel", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 1, -20),
+                Size = UDim2.new(1, 0, 0, 14), Font = Enum.Font.GothamMedium, Text = label,
+                TextSize = 10, TextColor3 = THEME.sub }, card)
+            return value
+        end
+
+        local hugeValue   = makeStat(1, "TOTAL HUGES", THEME.gold, true)
+        local fpsValue    = makeStat(2, "FPS", THEME.accentB, false)
+        local uptimeValue = makeStat(3, "UPTIME", THEME.accentA, false)
+
+        local consoleWrap = mk("Frame", { Name = "Console", Position = UDim2.fromOffset(12, 142),
+            Size = UDim2.new(1, -24, 1, -198), BackgroundColor3 = THEME.bg2, BackgroundTransparency = 0.25,
+            BorderSizePixel = 0 }, main)
+        mk("UICorner", { CornerRadius = UDim.new(0, 10) }, consoleWrap)
+        mk("UIStroke", { Thickness = 1, Color = THEME.stroke, Transparency = 0.3 }, consoleWrap)
+        mk("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 8),
+            Size = UDim2.new(1, -24, 0, 14), Font = Enum.Font.GothamBold, Text = "CONSOLE", TextSize = 11,
+            TextColor3 = THEME.sub, TextXAlignment = Enum.TextXAlignment.Left }, consoleWrap)
+
+        local logScroll = mk("ScrollingFrame", { Position = UDim2.fromOffset(8, 28), Size = UDim2.new(1, -16, 1, -36),
+            BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3,
+            ScrollBarImageColor3 = THEME.accentA, CanvasSize = UDim2.new(0, 0, 0, 0),
+            AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y }, consoleWrap)
+        local logLayout = mk("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2) }, logScroll)
+        mk("UIPadding", { PaddingRight = UDim.new(0, 4) }, logScroll)
+
+        local function makeButton(text, posX, width, accent)
+            local b = mk("TextButton", { Position = UDim2.new(0, posX, 1, -42), Size = UDim2.fromOffset(width, 30),
+                BackgroundColor3 = THEME.bg2, Text = text, Font = Enum.Font.GothamBold, TextSize = 12,
+                TextColor3 = THEME.text, AutoButtonColor = true, BorderSizePixel = 0 }, main)
+            mk("UICorner", { CornerRadius = UDim.new(0, 9) }, b)
+            mk("UIStroke", { Thickness = 1.2, Color = accent, Transparency = 0.2 }, b)
+            return b
+        end
+        local boostBtn = makeButton("BOOST: ...", 12, 200, THEME.accentB)
+        local clearBtn = makeButton("CLEAR", 222, 106, THEME.accentA)
+
+        -- konsol log mirror
+        local lines = {}
+        local function pushLine(text, color)
+            local lbl = mk("TextLabel", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+                BackgroundTransparency = 1, Font = Enum.Font.Code, Text = text, TextSize = 12, TextColor3 = color,
+                TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
+                TextWrapped = true, LayoutOrder = #lines + 1 }, logScroll)
+            table.insert(lines, lbl)
+            if #lines > MAX_LOG_LINES then
+                local oldl = table.remove(lines, 1)
+                if oldl then oldl:Destroy() end
+            end
+            task.defer(function()
+                logScroll.CanvasPosition = Vector2.new(0, logLayout.AbsoluteContentSize.Y)
+            end)
+        end
+        local function colorFor(mt)
+            if mt == Enum.MessageType.MessageWarning then return THEME.warnC end
+            if mt == Enum.MessageType.MessageError then return THEME.errC end
+            return THEME.text
+        end
+        LogService.MessageOut:Connect(function(text, mt)
+            pushLine(text, colorFor(mt))
+        end)
+        pushLine("[badu] HUD baslatildi.", THEME.accentB)
+
+        -- fps + uptime
+        local fps = 60
+        local lastClock = os.clock()
+        RunService.RenderStepped:Connect(function()
+            local now = os.clock(); local dt = now - lastClock; lastClock = now
+            if dt > 0 then fps = fps * 0.9 + (1 / dt) * 0.1 end
+        end)
+        local startT = os.time()
+
+        -- boost (oyun optimizasyonu)
+        local boostOn, sv = false, {}
+        local function setBoost(on)
+            boostOn = on
+            boostBtn.Text = on and "BOOST: ON" or "BOOST: OFF"
+            boostBtn.TextColor3 = on and THEME.accentB or THEME.sub
+            pcall(function()
+                if on then sv.q = settings().Rendering.QualityLevel; settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+                elseif sv.q then settings().Rendering.QualityLevel = sv.q end
+            end)
+            pcall(function()
+                if on then sv.sh = Lighting.GlobalShadows; sv.fg = Lighting.FogEnd; sv.br = Lighting.Brightness
+                    Lighting.GlobalShadows = false; Lighting.FogEnd = 1e6; Lighting.Brightness = 1
+                else
+                    if sv.sh ~= nil then Lighting.GlobalShadows = sv.sh end
+                    if sv.fg then Lighting.FogEnd = sv.fg end
+                    if sv.br then Lighting.Brightness = sv.br end
+                end
+            end)
+            local terrain = workspace:FindFirstChildOfClass("Terrain")
+            if terrain then pcall(function()
+                if on then sv.a,sv.b,sv.c,sv.d = terrain.WaterWaveSize,terrain.WaterWaveSpeed,terrain.WaterReflectance,terrain.WaterTransparency
+                    terrain.WaterWaveSize=0; terrain.WaterWaveSpeed=0; terrain.WaterReflectance=0; terrain.WaterTransparency=0.9
+                else
+                    if sv.a then terrain.WaterWaveSize=sv.a; terrain.WaterWaveSpeed=sv.b; terrain.WaterReflectance=sv.c; terrain.WaterTransparency=sv.d end
+                end
+            end) end
+        end
+        boostBtn.MouseButton1Click:Connect(function() setBoost(not boostOn) end)
+        clearBtn.MouseButton1Click:Connect(function()
+            for _, l in ipairs(lines) do l:Destroy() end
+            table.clear(lines)
+            pushLine("[badu] Konsol temizlendi.", THEME.sub)
+        end)
+
+        -- minimize
+        local minimized, fullSize = false, main.Size
+        minBtn.MouseButton1Click:Connect(function()
+            minimized = not minimized
+            statsRow.Visible = not minimized
+            consoleWrap.Visible = not minimized
+            boostBtn.Visible = not minimized
+            clearBtn.Visible = not minimized
+            main.Size = minimized and UDim2.fromOffset(fullSize.X.Offset, 46) or fullSize
+            minBtn.Text = minimized and "+" or "—"
+        end)
+
+        -- surukleme
+        local dragging, dragStart, startPos
+        header.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true; dragStart = input.Position; startPos = main.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                end)
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+
+        -- nabiz
+        task.spawn(function()
+            while screen.Parent do
+                for i = 0, 1, 0.05 do if not screen.Parent then break end dot.BackgroundTransparency = i; task.wait(0.03) end
+                for i = 1, 0, -0.05 do if not screen.Parent then break end dot.BackgroundTransparency = i; task.wait(0.03) end
+            end
+        end)
+        -- fps + uptime guncelle
+        task.spawn(function()
+            while screen.Parent do
+                fpsValue.Text = tostring(math.floor(fps + 0.5))
+                local s = os.time() - startT
+                uptimeValue.Text = string.format("%02d:%02d", math.floor(s / 60), s % 60)
+                task.wait(0.5)
+            end
+        end)
+        -- huge sayaci (mevcut GetTotalHuges'u kullanir)
+        task.spawn(function()
+            while screen.Parent do
+                local okh, h = pcall(GetTotalHuges)
+                hugeValue.Text = okh and commas(h) or "—"
+                task.wait(2)
+            end
+        end)
+
+        if BOOST_DEFAULT then setBoost(true) end
+    end)
+
+    if not ok then
+        warn("[badu HUD]: UI olusturulamadi (capability/Instance erisimi?) -> " .. tostring(err))
+    end
+end)
+
 local TempRAP = {}
 local function ProcessItem(CurrentInfo, Data, Booth)
     FindInfo = Data.FindInfo
