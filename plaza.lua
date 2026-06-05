@@ -1167,6 +1167,7 @@ task.spawn(function()
 
     if not built then
         warn("[badu] Overlay build hatasi -> " .. tostring(buildErr))
+        pcall(function() if statusLabel then statusLabel.Text = "⚠️ BUILD: " .. tostring(buildErr):sub(1, 110) end end)
         return
     end
 
@@ -1179,7 +1180,7 @@ task.spawn(function()
     end)
     local cN, cG, cR, cS = hex(THEME.text), hex(THEME.gold), hex(THEME.accentB), hex(THEME.accentA)
     local tickN = 0
-    while screen and screen.Parent do
+    while screen do
         local okU, errU = pcall(function()
             local s = os.time() - startT
             local dia = "—"
