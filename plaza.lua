@@ -996,7 +996,7 @@ local function SellerNotification(CurrentInfo)
 end
 
 --==================================================
--- badu | Plaza HUD  (entegre overlay - plazajxnt icinde calisir)
+-- badu | Plaza Overlay  (tam ekran splash - plazajxnt icinde calisir)
 --==================================================
 task.spawn(function()
     -- capability hatasi (Instance erisemiyor) icin thread yetkisini yukseltmeyi dene
@@ -1009,13 +1009,13 @@ task.spawn(function()
     local Lighting = game:GetService("Lighting")
 
     local THEME = {
-        bg = Color3.fromRGB(15,14,21), bg2 = Color3.fromRGB(23,21,32), stroke = Color3.fromRGB(48,44,66),
-        accentA = Color3.fromRGB(176,124,255), accentB = Color3.fromRGB(72,222,250), gold = Color3.fromRGB(232,214,124),
-        text = Color3.fromRGB(236,236,246), sub = Color3.fromRGB(150,148,170),
-        warnC = Color3.fromRGB(232,214,124), errC = Color3.fromRGB(235,96,96),
+        bg = Color3.fromRGB(9,9,14), panel = Color3.fromRGB(17,16,24),
+        accentA = Color3.fromRGB(176,124,255), accentB = Color3.fromRGB(72,222,250),
+        gold = Color3.fromRGB(232,214,124), text = Color3.fromRGB(236,236,246),
+        sub = Color3.fromRGB(150,148,170), warnC = Color3.fromRGB(232,214,124), errC = Color3.fromRGB(235,96,96),
     }
-    local MAX_LOG_LINES = 120
-    local BOOST_DEFAULT  = true
+    local TOGGLE_KEY    = Enum.KeyCode.RightShift
+    local MAX_LOG_LINES = 60
 
     local function mk(class, props, parent)
         local i = Instance.new(class)
@@ -1028,6 +1028,9 @@ task.spawn(function()
         repeat s, k = s:gsub("^(-?%d+)(%d%d%d)", "%1,%2") until k == 0
         return s
     end
+    local function hex(c)
+        return string.format("#%02X%02X%02X", math.floor(c.R*255+0.5), math.floor(c.G*255+0.5), math.floor(c.B*255+0.5))
+    end
     local function getParent()
         local a, b = pcall(function() return gethui() end)
         if a and b then return b end
@@ -1036,234 +1039,189 @@ task.spawn(function()
         return LocalPlayer:WaitForChild("PlayerGui")
     end
 
+    -- envanterdeki huge'lari variant'a gore say
+    local function hugeStats()
+        local r = {total=0, normal=0, golden=0, rainbow=0, shiny=0, sg=0, sr=0}
+        pcall(function()
+            local inv = GetInventoryByClass("Pet")
+            if not inv or not inv._byUID then return end
+            for _, it in pairs(inv._byUID) do
+                if it.IsHuge and it:IsHuge() then
+                    local amt = (it._data and it._data["_am"]) or 1
+                    local sh = it.IsShiny and it:IsShiny() or false
+                    local gd = it.IsGolden and it:IsGolden() or false
+                    local rb = it.IsRainbow and it:IsRainbow() or false
+                    r.total += amt
+                    if sh and gd then r.sg += amt
+                    elseif sh and rb then r.sr += amt
+                    elseif sh then r.shiny += amt
+                    elseif gd then r.golden += amt
+                    elseif rb then r.rainbow += amt
+                    else r.normal += amt end
+                end
+            end
+        end)
+        return r
+    end
+
     local ok, err = pcall(function()
         pcall(function()
             local old = getParent():FindFirstChild("baduPlazaHUD")
             if old then old:Destroy() end
         end)
 
-        local screen = mk("ScreenGui", {
-            Name = "baduPlazaHUD", ResetOnSpawn = false,
-            ZIndexBehavior = Enum.ZIndexBehavior.Sibling, IgnoreGuiInset = true, DisplayOrder = 9999,
-        }, getParent())
+        local screen = mk("ScreenGui", { Name = "baduPlazaHUD", ResetOnSpawn = false,
+            ZIndexBehavior = Enum.ZIndexBehavior.Sibling, IgnoreGuiInset = true, DisplayOrder = 99999 }, getParent())
 
-        local main = mk("Frame", {
-            Name = "Main", Size = UDim2.fromOffset(340, 430), Position = UDim2.fromOffset(40, 120),
-            BackgroundColor3 = THEME.bg, BackgroundTransparency = 0.05, BorderSizePixel = 0,
-        }, screen)
-        mk("UICorner", { CornerRadius = UDim.new(0, 14) }, main)
-        local mainStroke = mk("UIStroke", { Thickness = 1.4, Color = THEME.stroke, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, main)
-        mk("UIGradient", { Rotation = 35, Color = ColorSequence.new(THEME.accentA, THEME.accentB) }, mainStroke)
+        -- TAM EKRAN KOYU ZEMIN
+        local cover = mk("Frame", { Name = "Cover", Size = UDim2.fromScale(1, 1),
+            BackgroundColor3 = THEME.bg, BackgroundTransparency = 0, BorderSizePixel = 0, Active = true }, screen)
+        mk("UIGradient", { Rotation = 90,
+            Color = ColorSequence.new(Color3.fromRGB(13,12,20), Color3.fromRGB(6,6,10)) }, cover)
 
-        local header = mk("Frame", {
-            Name = "Header", Size = UDim2.new(1, 0, 0, 46),
-            BackgroundColor3 = THEME.bg2, BackgroundTransparency = 0.2, BorderSizePixel = 0,
-        }, main)
-        mk("UICorner", { CornerRadius = UDim.new(0, 14) }, header)
-        mk("Frame", { Size = UDim2.new(1, 0, 0, 14), Position = UDim2.new(0, 0, 1, -14),
-            BackgroundColor3 = THEME.bg2, BackgroundTransparency = 0.2, BorderSizePixel = 0 }, header)
-
-        local dot = mk("Frame", { Size = UDim2.fromOffset(10, 10), Position = UDim2.fromOffset(16, 18),
-            BackgroundColor3 = THEME.accentB, BorderSizePixel = 0 }, header)
-        mk("UICorner", { CornerRadius = UDim.new(1, 0) }, dot)
-
-        local title = mk("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(34, 8),
-            Size = UDim2.fromOffset(120, 18), Font = Enum.Font.GothamBlack, Text = "badu", TextSize = 17,
-            TextColor3 = THEME.text, TextXAlignment = Enum.TextXAlignment.Left }, header)
-        mk("UIGradient", { Color = ColorSequence.new(THEME.accentA, THEME.accentB) }, title)
-        mk("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(34, 25),
-            Size = UDim2.fromOffset(160, 14), Font = Enum.Font.GothamMedium, Text = "PLAZA HUD", TextSize = 11,
-            TextColor3 = THEME.sub, TextXAlignment = Enum.TextXAlignment.Left }, header)
-
-        local minBtn = mk("TextButton", { Size = UDim2.fromOffset(28, 28), Position = UDim2.new(1, -38, 0, 9),
-            BackgroundColor3 = THEME.bg, Text = "—", Font = Enum.Font.GothamBold, TextSize = 16,
-            TextColor3 = THEME.sub, AutoButtonColor = true, BorderSizePixel = 0 }, header)
-        mk("UICorner", { CornerRadius = UDim.new(0, 8) }, minBtn)
-
-        local statsRow = mk("Frame", { Name = "Stats", BackgroundTransparency = 1,
-            Position = UDim2.fromOffset(12, 56), Size = UDim2.new(1, -24, 0, 78) }, main)
-        mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal,
+        -- ORTA ICERIK
+        local center = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.46), Size = UDim2.fromOffset(760, 440),
+            BackgroundTransparency = 1 }, cover)
+        mk("UIListLayout", { FillDirection = Enum.FillDirection.Vertical,
             HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center,
-            Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, statsRow)
+            Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }, center)
 
-        local function makeStat(order, label, accent, wide)
-            local card = mk("Frame", { LayoutOrder = order,
-                Size = wide and UDim2.fromOffset(150, 74) or UDim2.fromOffset(78, 74),
-                BackgroundColor3 = THEME.bg2, BackgroundTransparency = 0.15, BorderSizePixel = 0 }, statsRow)
-            mk("UICorner", { CornerRadius = UDim.new(0, 10) }, card)
-            mk("UIStroke", { Thickness = 1, Color = THEME.stroke, Transparency = 0.3 }, card)
-            local bar = mk("Frame", { Size = UDim2.new(1, -20, 0, 2), Position = UDim2.new(0, 10, 0, 10),
-                BackgroundColor3 = accent, BorderSizePixel = 0 }, card)
-            mk("UICorner", { CornerRadius = UDim.new(1, 0) }, bar)
-            local value = mk("TextLabel", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 0, 20),
-                Size = UDim2.new(1, 0, 0, 30), Font = Enum.Font.GothamBlack, Text = "—",
-                TextSize = wide and 26 or 20, TextColor3 = THEME.text }, card)
-            mk("TextLabel", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 1, -20),
-                Size = UDim2.new(1, 0, 0, 14), Font = Enum.Font.GothamMedium, Text = label,
-                TextSize = 10, TextColor3 = THEME.sub }, card)
-            return value
+        local function row(order, h)
+            return mk("Frame", { LayoutOrder = order, Size = UDim2.new(1, 0, 0, h), BackgroundTransparency = 1 }, center)
+        end
+        local function label(parent, txt, size, color, font)
+            return mk("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, RichText = true,
+                Font = font or Enum.Font.GothamBold, Text = txt, TextSize = size, TextColor3 = color or THEME.text,
+                TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center }, parent)
+        end
+        local function divider(order)
+            local f = mk("Frame", { LayoutOrder = order, Size = UDim2.new(0, 440, 0, 2),
+                BackgroundColor3 = THEME.accentA, BorderSizePixel = 0 }, center)
+            mk("UIGradient", { Color = ColorSequence.new(THEME.accentA, THEME.accentB),
+                Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,1), NumberSequenceKeypoint.new(0.5,0), NumberSequenceKeypoint.new(1,1) }) }, f)
+            return f
         end
 
-        local hugeValue   = makeStat(1, "TOTAL HUGES", THEME.gold, true)
-        local fpsValue    = makeStat(2, "FPS", THEME.accentB, false)
-        local uptimeValue = makeStat(3, "UPTIME", THEME.accentA, false)
+        label(row(1, 56),
+            "<font color='"..hex(THEME.gold).."'>「</font>  <font color='"..hex(THEME.accentA).."'>badu</font>  <font color='"..hex(THEME.gold).."'>」</font>",
+            46, THEME.text, Enum.Font.GothamBlack)
+        label(row(2, 18), "PLAZA  •  AUTO SELLER", 13, THEME.sub, Enum.Font.GothamMedium)
+        divider(3)
+        local statusLabel = label(row(4, 22), "📋 Hazirlaniyor...", 16, THEME.text, Enum.Font.GothamMedium)
+        divider(5)
+        local hugeLabel = label(row(6, 42), "Total Huge:  —", 30, THEME.gold, Enum.Font.GothamBlack)
+        local v1Label   = label(row(7, 24), "Normal / Golden / Rainbow", 17)
+        local v2Label   = label(row(8, 24), "Shiny / Shiny Golden / Shiny Rainbow", 17)
+        divider(9)
+        local bottomLabel = label(row(10, 22), "💎 —   •   FPS —   •   ⏱ 00:00", 15, THEME.sub, Enum.Font.GothamMedium)
+        label(row(11, 18), "[ Right Shift ] ekrani gizle / goster", 12, THEME.sub, Enum.Font.Gotham)
 
-        local consoleWrap = mk("Frame", { Name = "Console", Position = UDim2.fromOffset(12, 142),
-            Size = UDim2.new(1, -24, 1, -198), BackgroundColor3 = THEME.bg2, BackgroundTransparency = 0.25,
-            BorderSizePixel = 0 }, main)
+        -- ALT SLIM KONSOL
+        local consoleWrap = mk("Frame", { Name = "Console", AnchorPoint = Vector2.new(0.5, 1),
+            Position = UDim2.new(0.5, 0, 1, -16), Size = UDim2.fromOffset(620, 120),
+            BackgroundColor3 = THEME.panel, BackgroundTransparency = 0.35, BorderSizePixel = 0 }, cover)
         mk("UICorner", { CornerRadius = UDim.new(0, 10) }, consoleWrap)
-        mk("UIStroke", { Thickness = 1, Color = THEME.stroke, Transparency = 0.3 }, consoleWrap)
-        mk("TextLabel", { BackgroundTransparency = 1, Position = UDim2.fromOffset(12, 8),
-            Size = UDim2.new(1, -24, 0, 14), Font = Enum.Font.GothamBold, Text = "CONSOLE", TextSize = 11,
-            TextColor3 = THEME.sub, TextXAlignment = Enum.TextXAlignment.Left }, consoleWrap)
+        mk("UIStroke", { Thickness = 1, Color = THEME.accentA, Transparency = 0.6 }, consoleWrap)
+        local logScroll = mk("ScrollingFrame", { Position = UDim2.fromOffset(10, 8), Size = UDim2.new(1, -20, 1, -16),
+            BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 2, ScrollBarImageColor3 = THEME.accentA,
+            CanvasSize = UDim2.new(0,0,0,0), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+            ScrollingDirection = Enum.ScrollingDirection.Y }, consoleWrap)
+        local logLayout = mk("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 1) }, logScroll)
 
-        local logScroll = mk("ScrollingFrame", { Position = UDim2.fromOffset(8, 28), Size = UDim2.new(1, -16, 1, -36),
-            BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3,
-            ScrollBarImageColor3 = THEME.accentA, CanvasSize = UDim2.new(0, 0, 0, 0),
-            AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y }, consoleWrap)
-        local logLayout = mk("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2) }, logScroll)
-        mk("UIPadding", { PaddingRight = UDim.new(0, 4) }, logScroll)
-
-        local function makeButton(text, posX, width, accent)
-            local b = mk("TextButton", { Position = UDim2.new(0, posX, 1, -42), Size = UDim2.fromOffset(width, 30),
-                BackgroundColor3 = THEME.bg2, Text = text, Font = Enum.Font.GothamBold, TextSize = 12,
-                TextColor3 = THEME.text, AutoButtonColor = true, BorderSizePixel = 0 }, main)
-            mk("UICorner", { CornerRadius = UDim.new(0, 9) }, b)
-            mk("UIStroke", { Thickness = 1.2, Color = accent, Transparency = 0.2 }, b)
-            return b
-        end
-        local boostBtn = makeButton("BOOST: ...", 12, 200, THEME.accentB)
-        local clearBtn = makeButton("CLEAR", 222, 106, THEME.accentA)
-
-        -- konsol log mirror
         local lines = {}
+        local function colorFor(mt)
+            if mt == Enum.MessageType.MessageWarning then return THEME.warnC end
+            if mt == Enum.MessageType.MessageError then return THEME.errC end
+            return THEME.text
+        end
         local function pushLine(text, color)
             local lbl = mk("TextLabel", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
                 BackgroundTransparency = 1, Font = Enum.Font.Code, Text = text, TextSize = 12, TextColor3 = color,
                 TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
                 TextWrapped = true, LayoutOrder = #lines + 1 }, logScroll)
             table.insert(lines, lbl)
-            if #lines > MAX_LOG_LINES then
-                local oldl = table.remove(lines, 1)
-                if oldl then oldl:Destroy() end
-            end
-            task.defer(function()
-                logScroll.CanvasPosition = Vector2.new(0, logLayout.AbsoluteContentSize.Y)
-            end)
-        end
-        local function colorFor(mt)
-            if mt == Enum.MessageType.MessageWarning then return THEME.warnC end
-            if mt == Enum.MessageType.MessageError then return THEME.errC end
-            return THEME.text
+            if #lines > MAX_LOG_LINES then local o = table.remove(lines, 1) if o then o:Destroy() end end
+            task.defer(function() logScroll.CanvasPosition = Vector2.new(0, logLayout.AbsoluteContentSize.Y) end)
         end
         LogService.MessageOut:Connect(function(text, mt)
             pushLine(text, colorFor(mt))
+            local short = text:gsub("%[Plaza Plus%]:%s*", ""):gsub("%[badu%]%s*", "")
+            statusLabel.Text = "📋 " .. short:sub(1, 80)
         end)
-        pushLine("[badu] HUD baslatildi.", THEME.accentB)
+        pushLine("[badu] Overlay baslatildi.", THEME.accentB)
 
-        -- fps + uptime
+        -- fps (Heartbeat -> 3D kapaliyken de calisir)
         local fps = 60
-        local lastClock = os.clock()
-        RunService.RenderStepped:Connect(function()
-            local now = os.clock(); local dt = now - lastClock; lastClock = now
+        RunService.Heartbeat:Connect(function(dt)
             if dt > 0 then fps = fps * 0.9 + (1 / dt) * 0.1 end
         end)
         local startT = os.time()
 
-        -- boost (oyun optimizasyonu)
-        local boostOn, sv = false, {}
-        local function setBoost(on)
-            boostOn = on
-            boostBtn.Text = on and "BOOST: ON" or "BOOST: OFF"
-            boostBtn.TextColor3 = on and THEME.accentB or THEME.sub
+        -- optimizasyon: 3D render kapat + kalite/isik dusur
+        local sv = {}
+        local function setOptimize(on)
+            pcall(function() RunService:Set3dRenderingEnabled(not on) end)
             pcall(function()
-                if on then sv.q = settings().Rendering.QualityLevel; settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+                if on then sv.q = sv.q or settings().Rendering.QualityLevel; settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
                 elseif sv.q then settings().Rendering.QualityLevel = sv.q end
             end)
             pcall(function()
-                if on then sv.sh = Lighting.GlobalShadows; sv.fg = Lighting.FogEnd; sv.br = Lighting.Brightness
+                if on then
+                    if sv.sh == nil then sv.sh = Lighting.GlobalShadows; sv.fg = Lighting.FogEnd; sv.br = Lighting.Brightness end
                     Lighting.GlobalShadows = false; Lighting.FogEnd = 1e6; Lighting.Brightness = 1
-                else
-                    if sv.sh ~= nil then Lighting.GlobalShadows = sv.sh end
-                    if sv.fg then Lighting.FogEnd = sv.fg end
-                    if sv.br then Lighting.Brightness = sv.br end
+                elseif sv.sh ~= nil then
+                    Lighting.GlobalShadows = sv.sh; Lighting.FogEnd = sv.fg; Lighting.Brightness = sv.br
                 end
             end)
-            local terrain = workspace:FindFirstChildOfClass("Terrain")
-            if terrain then pcall(function()
-                if on then sv.a,sv.b,sv.c,sv.d = terrain.WaterWaveSize,terrain.WaterWaveSpeed,terrain.WaterReflectance,terrain.WaterTransparency
-                    terrain.WaterWaveSize=0; terrain.WaterWaveSpeed=0; terrain.WaterReflectance=0; terrain.WaterTransparency=0.9
-                else
-                    if sv.a then terrain.WaterWaveSize=sv.a; terrain.WaterWaveSpeed=sv.b; terrain.WaterReflectance=sv.c; terrain.WaterTransparency=sv.d end
-                end
-            end) end
         end
-        boostBtn.MouseButton1Click:Connect(function() setBoost(not boostOn) end)
-        clearBtn.MouseButton1Click:Connect(function()
-            for _, l in ipairs(lines) do l:Destroy() end
-            table.clear(lines)
-            pushLine("[badu] Konsol temizlendi.", THEME.sub)
+
+        -- goster/gizle (RightShift)
+        local shown = true
+        local function setShown(v)
+            shown = v
+            cover.Visible = v
+            setOptimize(v)
+        end
+        UserInputService.InputBegan:Connect(function(input, gpe)
+            if gpe then return end
+            if input.KeyCode == TOGGLE_KEY then setShown(not shown) end
         end)
 
-        -- minimize
-        local minimized, fullSize = false, main.Size
-        minBtn.MouseButton1Click:Connect(function()
-            minimized = not minimized
-            statsRow.Visible = not minimized
-            consoleWrap.Visible = not minimized
-            boostBtn.Visible = not minimized
-            clearBtn.Visible = not minimized
-            main.Size = minimized and UDim2.fromOffset(fullSize.X.Offset, 46) or fullSize
-            minBtn.Text = minimized and "+" or "—"
-        end)
-
-        -- surukleme
-        local dragging, dragStart, startPos
-        header.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true; dragStart = input.Position; startPos = main.Position
-                input.Changed:Connect(function()
-                    if input.UserInputState == Enum.UserInputState.End then dragging = false end
-                end)
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                local delta = input.Position - dragStart
-                main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            end
-        end)
-
-        -- nabiz
+        -- guncelleme: fps / uptime / diamonds
         task.spawn(function()
             while screen.Parent do
-                for i = 0, 1, 0.05 do if not screen.Parent then break end dot.BackgroundTransparency = i; task.wait(0.03) end
-                for i = 1, 0, -0.05 do if not screen.Parent then break end dot.BackgroundTransparency = i; task.wait(0.03) end
-            end
-        end)
-        -- fps + uptime guncelle
-        task.spawn(function()
-            while screen.Parent do
-                fpsValue.Text = tostring(math.floor(fps + 0.5))
                 local s = os.time() - startT
-                uptimeValue.Text = string.format("%02d:%02d", math.floor(s / 60), s % 60)
+                local dia = "—"
+                pcall(function() dia = AddSuffix(GetDiamonds()) end)
+                bottomLabel.Text = string.format("💎 %s   •   FPS %d   •   ⏱ %02d:%02d",
+                    tostring(dia), math.floor(fps + 0.5), math.floor(s / 60), s % 60)
                 task.wait(0.5)
             end
         end)
-        -- huge sayaci (mevcut GetTotalHuges'u kullanir)
+        -- guncelleme: huge dokumu
         task.spawn(function()
+            local cN, cG, cR, cS = hex(THEME.text), hex(THEME.gold), hex(THEME.accentB), hex(THEME.accentA)
             while screen.Parent do
-                local okh, h = pcall(GetTotalHuges)
-                hugeValue.Text = okh and commas(h) or "—"
+                local r = hugeStats()
+                hugeLabel.Text = "Total Huge:  <b>" .. commas(r.total) .. "</b>"
+                v1Label.Text = string.format(
+                    "<font color='%s'>Normal</font> / <font color='%s'>Golden</font> / <font color='%s'>Rainbow</font>:   "..
+                    "<font color='%s'>%s</font> / <font color='%s'>%s</font> / <font color='%s'>%s</font>",
+                    cN, cG, cR, cN, commas(r.normal), cG, commas(r.golden), cR, commas(r.rainbow))
+                v2Label.Text = string.format(
+                    "<font color='%s'>Shiny</font> / <font color='%s'>Shiny Golden</font> / <font color='%s'>Shiny Rainbow</font>:   "..
+                    "<font color='%s'>%s</font> / <font color='%s'>%s</font> / <font color='%s'>%s</font>",
+                    cS, cG, cR, cS, commas(r.shiny), cG, commas(r.sg), cR, commas(r.sr))
                 task.wait(2)
             end
         end)
 
-        if BOOST_DEFAULT then setBoost(true) end
+        setShown(true)  -- overlay acik + optimize acik
     end)
 
     if not ok then
-        warn("[badu HUD]: UI olusturulamadi (capability/Instance erisimi?) -> " .. tostring(err))
+        warn("[badu HUD]: Overlay olusturulamadi (capability/Instance erisimi?) -> " .. tostring(err))
     end
 end)
 
