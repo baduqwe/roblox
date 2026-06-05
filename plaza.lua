@@ -1064,22 +1064,42 @@ task.spawn(function()
         return r
     end
 
-    local ok, err = pcall(function()
+    -- log -> "Hazirlaniyor" satirini canli aksiyon ile guncelle
+    local function pretty(t)
+        t = tostring(t)
+        if t:find("Booth was claimed") then return "✅ Booth alindi, listeleniyor..." end
+        local listing = t:match("Attempting to list:%s*(.-)%s*%(")
+        if listing then return "📦 Booth'a koyuluyor: " .. listing end
+        if t:find("Added item") then
+            local added = t:match("Added item:%s*(.-)%s*x%d")
+            return "📥 Eklendi: " .. (added or "")
+        end
+        if t:find("FAILED to add item") then return "⚠️ Eklenemedi, tekrar deneniyor..." end
+        if t:find("was sold") then return "💰 Satildi!" end
+        local sniping = t:match("Sniping:%s*(.+)")
+        if sniping then return "🎯 Snipe: " .. sniping end
+        local generic = t:match("%[Plaza Plus%]:%s*(.+)")
+        if generic then return "📋 " .. generic:sub(1, 70) end
+        return nil
+    end
+
+    -- label referanslari dista dursun ki guncelleme dongusu erissin
+    local screen, statusLabel, hugeLabel, v1Label, v2Label, bottomLabel
+
+    local built, buildErr = pcall(function()
         pcall(function()
             local old = getParent():FindFirstChild("baduPlazaHUD")
             if old then old:Destroy() end
         end)
 
-        local screen = mk("ScreenGui", { Name = "baduPlazaHUD", ResetOnSpawn = false,
+        screen = mk("ScreenGui", { Name = "baduPlazaHUD", ResetOnSpawn = false,
             ZIndexBehavior = Enum.ZIndexBehavior.Sibling, IgnoreGuiInset = true, DisplayOrder = 99999 }, getParent())
 
-        -- TAM EKRAN KOYU ZEMIN
         local cover = mk("Frame", { Name = "Cover", Size = UDim2.fromScale(1, 1),
             BackgroundColor3 = THEME.bg, BackgroundTransparency = 0, BorderSizePixel = 0, Active = true }, screen)
         mk("UIGradient", { Rotation = 90,
             Color = ColorSequence.new(Color3.fromRGB(13,12,20), Color3.fromRGB(6,6,10)) }, cover)
 
-        -- ORTA ICERIK
         local center = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5),
             Position = UDim2.fromScale(0.5, 0.46), Size = UDim2.fromOffset(760, 440),
             BackgroundTransparency = 1 }, cover)
@@ -1100,7 +1120,6 @@ task.spawn(function()
                 BackgroundColor3 = THEME.accentA, BorderSizePixel = 0 }, center)
             mk("UIGradient", { Color = ColorSequence.new(THEME.accentA, THEME.accentB),
                 Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,1), NumberSequenceKeypoint.new(0.5,0), NumberSequenceKeypoint.new(1,1) }) }, f)
-            return f
         end
 
         label(row(1, 56),
@@ -1108,46 +1127,20 @@ task.spawn(function()
             46, THEME.text, Enum.Font.GothamBlack)
         label(row(2, 18), "PLAZA  •  AUTO SELLER", 13, THEME.sub, Enum.Font.GothamMedium)
         divider(3)
-        local statusLabel = label(row(4, 22), "📋 Hazirlaniyor...", 16, THEME.text, Enum.Font.GothamMedium)
+        statusLabel = label(row(4, 22), "📋 Hazirlaniyor...", 16, THEME.text, Enum.Font.GothamMedium)
         divider(5)
-        local hugeLabel = label(row(6, 42), "Total Huge:  —", 30, THEME.gold, Enum.Font.GothamBlack)
-        local v1Label   = label(row(7, 24), "Normal / Golden / Rainbow", 17)
-        local v2Label   = label(row(8, 24), "Shiny / Shiny Golden / Shiny Rainbow", 17)
+        hugeLabel = label(row(6, 42), "Total Huge:  —", 30, THEME.gold, Enum.Font.GothamBlack)
+        v1Label   = label(row(7, 24), "Normal / Golden / Rainbow", 17)
+        v2Label   = label(row(8, 24), "Shiny / Shiny Golden / Shiny Rainbow", 17)
         divider(9)
-        local bottomLabel = label(row(10, 22), "💎 —   •   FPS —   •   ⏱ 00:00", 15, THEME.sub, Enum.Font.GothamMedium)
+        bottomLabel = label(row(10, 22), "💎 —   •   FPS —   •   ⏱ 00:00", 15, THEME.sub, Enum.Font.GothamMedium)
         label(row(11, 18), "[ Right Shift ] ekrani gizle / goster", 12, THEME.sub, Enum.Font.Gotham)
 
-        -- log -> "Hazirlaniyor" satirini canli aksiyon ile guncelle (konsol kutusu yok)
-        local function pretty(t)
-            t = tostring(t)
-            if t:find("Booth was claimed") then return "✅ Booth alindi, listeleniyor..." end
-            local listing = t:match("Attempting to list:%s*(.-)%s*%(")
-            if listing then return "📦 Booth'a koyuluyor: " .. listing end
-            if t:find("Added item") then
-                local added = t:match("Added item:%s*(.-)%s*x%d")
-                return "📥 Eklendi: " .. (added or "")
-            end
-            if t:find("FAILED to add item") then return "⚠️ Eklenemedi, tekrar deneniyor..." end
-            if t:find("was sold") then return "💰 Satildi!" end
-            local sniping = t:match("Sniping:%s*(.+)")
-            if sniping then return "🎯 Snipe: " .. sniping end
-            local generic = t:match("%[Plaza Plus%]:%s*(.+)")
-            if generic then return "📋 " .. generic:sub(1, 70) end
-            return nil
-        end
         LogService.MessageOut:Connect(function(text)
             local p = pretty(text)
-            if p then statusLabel.Text = p end
+            if p and statusLabel then statusLabel.Text = p end
         end)
 
-        -- fps (Heartbeat -> 3D kapaliyken de calisir)
-        local fps = 60
-        RunService.Heartbeat:Connect(function(dt)
-            if dt > 0 then fps = fps * 0.9 + (1 / dt) * 0.1 end
-        end)
-        local startT = os.time()
-
-        -- optimizasyon: kalite + isik (3D render KAPATILMIYOR -> scheduler donma riski yok)
         local sv = {}
         local function setOptimize(on)
             pcall(function()
@@ -1163,57 +1156,54 @@ task.spawn(function()
                 end
             end)
         end
-
-        -- goster/gizle (RightShift)
         local shown = true
-        local function setShown(v)
-            shown = v
-            cover.Visible = v
-            setOptimize(v)
-        end
+        local function setShown(v) shown = v; cover.Visible = v; setOptimize(v) end
         UserInputService.InputBegan:Connect(function(input, gpe)
             if gpe then return end
             if input.KeyCode == TOGGLE_KEY then setShown(not shown) end
         end)
-
-        -- guncelleme: fps / uptime / diamonds
-        task.spawn(function()
-            while screen.Parent do
-                pcall(function()
-                    local s = os.time() - startT
-                    local dia = "—"
-                    pcall(function() dia = AddSuffix(GetDiamonds()) end)
-                    bottomLabel.Text = string.format("💎 %s   •   FPS %d   •   ⏱ %02d:%02d",
-                        tostring(dia), math.floor(fps + 0.5), math.floor(s / 60), s % 60)
-                end)
-                task.wait(0.5)
-            end
-        end)
-        -- guncelleme: huge dokumu
-        task.spawn(function()
-            local cN, cG, cR, cS = hex(THEME.text), hex(THEME.gold), hex(THEME.accentB), hex(THEME.accentA)
-            while screen.Parent do
-                pcall(function()
-                    local r = hugeStats()
-                    hugeLabel.Text = "Total Huge:  <b>" .. commas(r.total) .. "</b>"
-                    v1Label.Text = string.format(
-                        "<font color='%s'>Normal</font> / <font color='%s'>Golden</font> / <font color='%s'>Rainbow</font>:   "..
-                        "<font color='%s'>%s</font> / <font color='%s'>%s</font> / <font color='%s'>%s</font>",
-                        cN, cG, cR, cN, commas(r.normal), cG, commas(r.golden), cR, commas(r.rainbow))
-                    v2Label.Text = string.format(
-                        "<font color='%s'>Shiny</font> / <font color='%s'>Shiny Golden</font> / <font color='%s'>Shiny Rainbow</font>:   "..
-                        "<font color='%s'>%s</font> / <font color='%s'>%s</font> / <font color='%s'>%s</font>",
-                        cS, cG, cR, cS, commas(r.shiny), cG, commas(r.sg), cR, commas(r.sr))
-                end)
-                task.wait(2)
-            end
-        end)
-
-        setShown(true)  -- overlay acik + optimize acik
+        setOptimize(true)
     end)
 
-    if not ok then
-        warn("[badu HUD]: Overlay olusturulamadi (capability/Instance erisimi?) -> " .. tostring(err))
+    if not built then
+        warn("[badu] Overlay build hatasi -> " .. tostring(buildErr))
+        return
+    end
+
+    -- GUNCELLEME DONGUSU: dis thread'de DOGRUDAN while (ic ice task.spawn yok)
+    -- Hata olursa ekrandaki status satirinda gosterilir (teshis icin).
+    local startT = os.time()
+    local fps = 60
+    pcall(function()
+        RunService.Heartbeat:Connect(function(dt) if dt > 0 then fps = fps * 0.9 + (1 / dt) * 0.1 end end)
+    end)
+    local cN, cG, cR, cS = hex(THEME.text), hex(THEME.gold), hex(THEME.accentB), hex(THEME.accentA)
+    local tickN = 0
+    while screen and screen.Parent do
+        local okU, errU = pcall(function()
+            local s = os.time() - startT
+            local dia = "—"
+            pcall(function() dia = AddSuffix(GetDiamonds()) end)
+            bottomLabel.Text = string.format("💎 %s   •   FPS %d   •   ⏱ %02d:%02d",
+                tostring(dia), math.floor(fps + 0.5), math.floor(s / 60), s % 60)
+            if tickN % 4 == 0 then
+                local r = hugeStats()
+                hugeLabel.Text = "Total Huge:  <b>" .. commas(r.total) .. "</b>"
+                v1Label.Text = string.format(
+                    "<font color='%s'>Normal</font> / <font color='%s'>Golden</font> / <font color='%s'>Rainbow</font>:   "..
+                    "<font color='%s'>%s</font> / <font color='%s'>%s</font> / <font color='%s'>%s</font>",
+                    cN, cG, cR, cN, commas(r.normal), cG, commas(r.golden), cR, commas(r.rainbow))
+                v2Label.Text = string.format(
+                    "<font color='%s'>Shiny</font> / <font color='%s'>Shiny Golden</font> / <font color='%s'>Shiny Rainbow</font>:   "..
+                    "<font color='%s'>%s</font> / <font color='%s'>%s</font> / <font color='%s'>%s</font>",
+                    cS, cG, cR, cS, commas(r.shiny), cG, commas(r.sg), cR, commas(r.sr))
+            end
+        end)
+        if not okU then
+            pcall(function() statusLabel.Text = "⚠️ HATA: " .. tostring(errU):sub(1, 100) end)
+        end
+        tickN += 1
+        task.wait(0.5)
     end
 end)
 
