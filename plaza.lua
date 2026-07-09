@@ -1,5 +1,5 @@
 local timer = tick()
-if not game:IsLoaded() then 
+if not game:IsLoaded() then
     game.Loaded:Wait()
 end
 
@@ -16,17 +16,17 @@ local LogService = game:GetService("LogService")
 local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
-repeat task.wait() 
+repeat task.wait()
     LocalPlayer = Players.LocalPlayer
 until LocalPlayer and LocalPlayer.GetAttribute and LocalPlayer:GetAttribute("__LOADED")
-if not LocalPlayer.Character then 
-    LocalPlayer.CharacterAdded:Wait() 
+if not LocalPlayer.Character then
+    LocalPlayer.CharacterAdded:Wait()
 end
 local HumanoidRootPart = LocalPlayer.Character.HumanoidRootPart
 
 --// GLOBAL
 local NLibrary = ReplicatedStorage.Library
-local PlayerSave = require(NLibrary.Client.Save) 
+local PlayerSave = require(NLibrary.Client.Save)
 local TradingPlazaCmds = require(NLibrary.Client.TradingPlazaCmds)
 local Abstract = require(NLibrary.Items.AbstractItem)
 local Types = require(NLibrary.Items.Types)
@@ -68,11 +68,11 @@ end
 
 local Booths, ClaimedBooths, BoothsInteractive, Interacts
 if table.find({PS99.Pro, PS99.Normal, PETSGO.Normal, PETSGO.Pro}, game.PlaceId) then
-    repeat task.wait() 
+    repeat task.wait()
         Booths = getsenv(NLibrary.Client:FindFirstChild("BoothCmds") or LocalPlayer.PlayerScripts.Scripts.Game["Trading Plaza"]["Booths Frontend"]).getState
     until Booths
     Booths = getupvalues(Booths)
-    repeat task.wait() 
+    repeat task.wait()
         Interacts = getsenv(NLibrary.Client:FindFirstChild("BoothCmds") or LocalPlayer.PlayerScripts.Scripts.Game["Trading Plaza"]["Booths Frontend"]).updateAllInteracts
     until Interacts
     ClaimedBooths = getupvalues(Interacts)[1]
@@ -131,13 +131,13 @@ local function AddSuffix(Amount)
     return (IsNegative and "-" or "")..("%.2f"):format(Amount / b):gsub("%.?0+$", "") .. (SuffixesLower[a] or "")
 end
 local function RemoveSuffix(Amount)
-	local a, Suffix = Amount:gsub("%a", ""), Amount:match("%a")	
+	local a, Suffix = Amount:gsub("%a", ""), Amount:match("%a")
 	local b = table.find(SuffixesUpper, Suffix) or table.find(SuffixesLower, Suffix) or 0
 	return tonumber(a) * math.pow(10, b * 3)
 end
 
 local function RemoveSuffix(Amount)
-	local Number, Suffix = Amount:gsub("%a", ""), Amount:match("%a")	
+	local Number, Suffix = Amount:gsub("%a", ""), Amount:match("%a")
 	local Type = table.find(SuffixesUpper, Suffix) or table.find(SuffixesLower, Suffix) or 0
 	return tonumber(Number) * math.pow(10, Type * 3)
 end
@@ -157,7 +157,7 @@ local function SetUISettings(Type)
         if Name == "Kill Switch" then
             for InsideName, Value in next, Params do
                 if not Value then continue end
-                if InsideName:find("Switch To") then 
+                if InsideName:find("Switch To") then
                     UI["Switch To "..InsideName:split("To ")[2]] = Value
                 elseif InsideName:find("Minutes Timer") then
                     UI["Minutes Timer"] = tonumber(InsideName:split(" Minutes")[1])*60
@@ -212,7 +212,7 @@ local function ColorizeConsole()
                     end)
                     Text = Text:gsub("Manipulated", "<font color='rgb(230, 70, 70)'>Manipulated</font>")
                     Text = Text:gsub("(Sniping:)( x%d+%s*)([^\n]*)", function(sniping, count, itemName)
-                        return "<font color='rgb(33, 239, 253)'>" .. sniping .. "</font>" .. 
+                        return "<font color='rgb(33, 239, 253)'>" .. sniping .. "</font>" ..
                                "<font color='rgb(230, 215, 123)'>" .. count .. itemName .. "</font>"
                     end)
                     Label.Text = Text
@@ -259,7 +259,7 @@ local function ConvertRoman(Number)
             Number = Number - value[1]
         end
     end
-    
+
     return result
 end
 local function ConvertNumerals(Roman)
@@ -278,7 +278,7 @@ local function ConvertNumerals(Roman)
 end
 local function AddCommas(Amount)
     local SuffixAdd = Amount
-    while task.wait() do  
+    while task.wait() do
         SuffixAdd, b = string.gsub(SuffixAdd, "^(-?%d+)(%d%d%d)", '%1,%2')
         if (b == 0) then
             break
@@ -304,7 +304,7 @@ for Name, Info in next, Classes do
     end
     if not Continue then
         Classes[Name] = nil
-        continue 
+        continue
     end
     if Name == "Misc" or Name == "Card" then
         DirectoryClasses[Name] = Name.."Items"
@@ -319,9 +319,9 @@ end
             for Item, Info in next, require(NLibrary.Directory[DirectoryClasses[Class]]) do
             if Info.DisplayName and type(Info.DisplayName) == "function" then
                 for i = Info.BaseTier, Info.MaxTier do
-                    ItemList[Class][Info.DisplayName(i)] = 
+                    ItemList[Class][Info.DisplayName(i)] =
                     {
-                        ["ID"] = Item, 
+                        ["ID"] = Item,
                         ["Display"] = Info.DisplayName(i),
                         ["Power"] = Info.Power(i),
                         ["Rarity"] = Info.Rarity(i),
@@ -351,7 +351,7 @@ end
                                 Display = Display.." "..ConvertRoman(i)
                             end
                         end
-                        ItemList[Class][Display] = 
+                        ItemList[Class][Display] =
                         {
                             ["ID"] = Item,
                             ["Display"] = Display,
@@ -412,7 +412,7 @@ local function GrabIDs(PlaceId)
     local Url = string.format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Desc&limit=100", PlaceId or game.PlaceId)
     if Cursor then
         Url = Url .. "&cursor=" .. Cursor
-    end 
+    end
     local Success, Response = pcall(function()
         return HttpService:JSONDecode(game:HttpGet(Url))
     end)
@@ -421,7 +421,7 @@ local function GrabIDs(PlaceId)
         return GrabIDs(PlaceId)
     end
     Site = Response
-    Cursor = Site.nextPageCursor    
+    Cursor = Site.nextPageCursor
     if Cursor == "null" or not Cursor then
         Cursor = nil
     end
@@ -435,12 +435,12 @@ local function GrabIDs(PlaceId)
         warn("[Plaza Plus]: Roblox is rate-limiting you... waiting 15 seconds.")
         task.wait(15)
         return GrabIDs(PlaceId)
-    end 
+    end
     FileSettings.Servers = {
         HaveJoined = 1,
         Time = os.time(),
         IDs
-    }   
+    }
     return Save()
 end
 local function Serverhop(NotPlaza)
@@ -460,8 +460,8 @@ local function Serverhop(NotPlaza)
         table.insert(Servers, RandomServer.JobID)
         FileSettings.LastJoinedServers = Servers
         Save()
-        
-        TeleportService:TeleportToPlaceInstance(RandomServer.PlaceID, RandomServer.JobID, LocalPlayer)        
+
+        TeleportService:TeleportToPlaceInstance(RandomServer.PlaceID, RandomServer.JobID, LocalPlayer)
 		task.wait(1.5)
     end
 end
@@ -520,7 +520,7 @@ local function ValidateItem(BoothItem, WantedItem)
             return false
         end
     elseif WantedItem.ID:find("Name Find") then
-        local Match = WantedItem.ID:split(": ")[2] 
+        local Match = WantedItem.ID:split(": ")[2]
         if not BoothItem.ID:find(Match) then
             return false
         end
@@ -557,7 +557,7 @@ local function GenerateFindInfo(Name, Data)
     FindInfo.ID = Name
     FindInfo.AllTypes = Data and Data.AllTypes and Data.AllTypes or nil
     FindInfo.AllTiers = Data and Data.AllTiers and Datal.AllTiers or nil
-    
+
     if not Name:find("Board") and not Name:find("Gem") then
         local RainbowPosition = Name:find("Rainbow")
         local HugePosition = Name:find("Huge")
@@ -809,7 +809,7 @@ local function ReturnValue(Pet)
             Value = RemoveSuffix(Value)
             Values[Pet] = Value
             return Value
-        end 
+        end
     end
     return nil
 end
@@ -838,13 +838,13 @@ local function GetMailCost()
 end
 
 local AdjectiveList = {
-    "Bold", "Quick", "Happy", "Sad", "Tiny", "Big", 
+    "Bold", "Quick", "Happy", "Sad", "Tiny", "Big",
     "Brave", "Clever", "Gentle", "Fierce", "Mighty", "Swift",
     "Calm", "Loyal", "Bright", "Wise", "Fearless", "Vivid"
 }
 
 local NounList = {
-    "Lion", "Castle", "Book", "Phone", "Cloud", "Mountain", 
+    "Lion", "Castle", "Book", "Phone", "Cloud", "Mountain",
     "Tiger", "Forest", "River", "Sword", "Shield", "Phoenix",
     "Galaxy", "Ocean", "Eagle", "Dragon", "Star", "Knight"
 }
@@ -891,7 +891,7 @@ local function GlobalNotification(CurrentInfo, FindInfo, Percent)
                     ["icon_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
                     ["text"] = "badu"
                 },
-                ["thumbnail"] = { 
+                ["thumbnail"] = {
                     ["url"] = "https://biggamesapi.io/image/"..Library.Functions.ParseAssetId(CurrentInfo.Icon)
                 },
             },
@@ -924,7 +924,7 @@ local function SniperNotification(CurrentInfo, FindInfo, Percent)
                     ["icon_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
                     ["text"] = "badu"
                 },
-                ["thumbnail"] = { 
+                ["thumbnail"] = {
                     ["url"] = "https://biggamesapi.io/image/"..Library.Functions.ParseAssetId(CurrentInfo.Icon)
                 },
             },
@@ -933,7 +933,7 @@ local function SniperNotification(CurrentInfo, FindInfo, Percent)
     request({
 		Url = UI["URL"],
 		Method = "POST",
-		Headers = {["Content-Type"] = "application/json"}, 
+		Headers = {["Content-Type"] = "application/json"},
 		Body = HttpService:JSONEncode(Message)
 	})
 end
@@ -952,6 +952,21 @@ local function GetTotalHuges()
     return Total
 end
 
+local function GetTotalGifts()
+    local Total = 0
+    local State = Library.InventoryCmds.State().container._store._byType
+    for Class, Inventory in pairs(State) do
+        if not Inventory or not Inventory._byUID then continue end
+        for _, ItemTable in pairs(Inventory._byUID) do
+            local ItemId = ItemTable.GetId and ItemTable:GetId() or (ItemTable._data and ItemTable._data.id)
+            if ItemId == "World Cup Gift" then
+                Total = Total + (ItemTable._data and ItemTable._data["_am"] or 1)
+            end
+        end
+    end
+    return Total
+end
+
 local function SellerNotification(CurrentInfo)
     local BoothCount, ItemCount = FindItemsInBooth(CurrentInfo.ID, CurrentInfo.Class)
     local Description = {
@@ -960,6 +975,7 @@ local function SellerNotification(CurrentInfo)
         "**<:Booth:1239350605294604378> Booth Count:** `"..AddCommas(ItemCount).."`",
         "**<:Bank:1295944894698754102> Current Diamonds:** `"..AddSuffix(GetDiamonds()).."`",
         "**<:Misc:1236020543082463253> Total Huges:** `"..AddCommas(GetTotalHuges()).."`",
+        "**<:Misc:1236020543082463253> Total Gifts:** `"..AddCommas(GetTotalGifts()).."`",
     }
 
     local Message = {
@@ -975,7 +991,7 @@ local function SellerNotification(CurrentInfo)
                     ["icon_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
                     ["text"] = "badu"
                 },
-                ["thumbnail"] = { 
+                ["thumbnail"] = {
                     ["url"] = "https://biggamesapi.io/image/"..Library.Functions.ParseAssetId(CurrentInfo.Icon)
                 },
             },
@@ -1048,10 +1064,10 @@ local function ProcessItem(CurrentInfo, Data, Booth)
             Save()
         end
     end
-    if Percent and Percent < 0 then 
-        TempPercent = math.abs(Percent).."% ABOVE RAP" 
+    if Percent and Percent < 0 then
+        TempPercent = math.abs(Percent).."% ABOVE RAP"
     elseif Percent and Percent > 0 then
-        TempPercent = Percent.."% BELOW RAP" 
+        TempPercent = Percent.."% BELOW RAP"
     else
         TempPercent = "N/A%"
     end
@@ -1129,16 +1145,16 @@ local function ProcessBooth(Booth, Data)
                 Rainbow = ItemInfo.Item.IsRainbow and ItemInfo.Item:IsRainbow(),
                 Golden = ItemInfo.Item.IsGolden and ItemInfo.Item:IsGolden(),
                 Shiny = ItemInfo.Item.IsShiny and ItemInfo.Item:IsShiny(),
-                
+
                 Amount = ItemData["_am"] or 1,
                 Tier = ItemData["tn"],
                 Cost = ItemInfo.DiamondCost,
-                RAP = (table.find({PS99.Normal, PS99.Pro}, game.PlaceId) and ItemInfo.Item.GetDevRAP and ItemInfo.Item:GetDevRAP()) or ItemInfo.Item.GetRAP and ItemInfo.Item:GetRAP(), 
-                
+                RAP = (table.find({PS99.Normal, PS99.Pro}, game.PlaceId) and ItemInfo.Item.GetDevRAP and ItemInfo.Item:GetDevRAP()) or ItemInfo.Item.GetRAP and ItemInfo.Item:GetRAP(),
+
                 IsHuge = ItemInfo.Item.IsHuge and ItemInfo.Item:IsHuge() or false,
                 IsTitanic = ItemInfo.Item.IsTitanic and ItemInfo.Item:IsTitanic() or false,
                 IsExclusive = ItemInfo.Item.GetRarity and ItemInfo.Item:GetRarity()._id == "Exclusive",
-                
+
                 Icon = ItemInfo.Item.GetIcon and ItemInfo.Item:GetIcon(),
                 Rarity = ItemInfo.Item.GetRarity and ItemInfo.Item:GetRarity()._id,
             }
@@ -1192,7 +1208,7 @@ end
 
 local function OrderedTable(tbl, order)
     local encodedParts = {}
-    
+
     for _, key in ipairs(order) do
         local value = tbl[key]
         local formattedValue
@@ -1243,7 +1259,7 @@ task.spawn(function()
 
                     local keyOrder = {"id", "pt", "sh", "tn"}
                     local SearchQuery = OrderedTable(searchTable, keyOrder)
-                
+
                     SearchTerminal(FindInfo.Class, SearchQuery, HttpService:JSONDecode(SearchQuery))
                     Settings.Sniper.Items[Name] = Settings.Sniper.Items[Name] or Data
                 end
@@ -1310,7 +1326,7 @@ while task.wait() and Settings.Sniper and Settings.Sniper.Active and FileSetting
         for Username, Booth in next, Users do
             CanContinue = false
             pcall(function()
-                if Booth.Player and Booth.Player:IsInGroup(5060810) then 
+                if Booth.Player and Booth.Player:IsInGroup(5060810) then
                     CanContinue = true
                 end
             end)
@@ -1346,52 +1362,6 @@ while task.wait() and Settings.Sniper and Settings.Sniper.Active and FileSetting
     end
     task.wait(1)
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 local LastUIDDs = {}
 if Settings.Seller and Settings.Seller.Active and FileSettings.Seller then
@@ -1457,10 +1427,10 @@ if Settings.Seller and Settings.Seller.Active and FileSettings.Seller then
             end
         end
     end
-    
+
     ClaimOptimalBooth()
     repeat task.wait() until ClaimedBooths[LocalPlayer]
-    warn("[Plaza Plus]: Booth was claimed, listing items...")   
+    warn("[Plaza Plus]: Booth was claimed, listing items...")
 
     Library.Network.Fired("Booths: Add History"):Connect(function(Info)
     --ReplicatedStorage.Network["Booths: Add History"].OnClientEvent:Connect(function(Info)
@@ -1527,7 +1497,7 @@ if Settings.Seller and Settings.Seller.Active and FileSettings.Seller then
         end
     end)
 
-    
+
     local function ProcessItem(Name, Data)
         local FindInfo = GenerateFindInfo(Name, Data)
         local UsedSlots = FindItemsInBooth()
@@ -1560,9 +1530,9 @@ if Settings.Seller and Settings.Seller.Active and FileSettings.Seller then
                 if ItemData.Shiny then NewItem:SetShiny(true) end
                 if ItemData.Color then NewItem:SetColorVariant(ItemData.Color) end
                 if ItemData.Tier then NewItem:SetTier(ItemData.Tier) end
-    
+
                 RAP = (table.find({PS99.Normal, PS99.Pro}, game.PlaceId) and NewItem.GetDevRAP and NewItem:GetDevRAP()) or NewItem.GetRAP and NewItem:GetRAP()
-                if not RAP then 
+                if not RAP then
                     table.insert(BlacklistedUIDs, UID)
                     continue
                 end
@@ -1594,7 +1564,7 @@ if Settings.Seller and Settings.Seller.Active and FileSettings.Seller then
                         warn(Result)
                         table.insert(BlacklistedUIDs, UID)
                         continue
-                    end                
+                    end
                 end
 
 
