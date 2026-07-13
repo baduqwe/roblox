@@ -959,7 +959,7 @@ local function GetTotalGifts()
         if not Inventory or not Inventory._byUID then continue end
         for _, ItemTable in pairs(Inventory._byUID) do
             local ItemId = ItemTable.GetId and ItemTable:GetId() or (ItemTable._data and ItemTable._data.id)
-            if ItemId == "World Cup Gift" then
+            if ItemId == "Marble Gift" then
                 Total = Total + (ItemTable._data and ItemTable._data["_am"] or 1)
             end
         end
