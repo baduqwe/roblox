@@ -952,14 +952,14 @@ local function GetTotalHuges()
     return Total
 end
 
-local function GetTotalGifts()
+local function GetItemAmount(TargetId)
     local Total = 0
     local State = Library.InventoryCmds.State().container._store._byType
     for Class, Inventory in pairs(State) do
         if not Inventory or not Inventory._byUID then continue end
         for _, ItemTable in pairs(Inventory._byUID) do
             local ItemId = ItemTable.GetId and ItemTable:GetId() or (ItemTable._data and ItemTable._data.id)
-            if ItemId == "Marble Gift" then
+            if ItemId == TargetId then
                 Total = Total + (ItemTable._data and ItemTable._data["_am"] or 1)
             end
         end
@@ -975,7 +975,10 @@ local function SellerNotification(CurrentInfo)
         "**<:Booth:1239350605294604378> Booth Count:** `"..AddCommas(ItemCount).."`",
         "**<:Bank:1295944894698754102> Current Diamonds:** `"..AddSuffix(GetDiamonds()).."`",
         "**<:Misc:1236020543082463253> Total Huges:** `"..AddCommas(GetTotalHuges()).."`",
-        "**<:Misc:1236020543082463253> Total Gifts:** `"..AddCommas(GetTotalGifts()).."`",
+        "**<:Misc:1236020543082463253> Total Gifts:** `"..AddCommas(GetItemAmount("Marble Gift")).."`",
+        "**<:Misc:1236020543082463253> Total Mini Pinata:** `"..AddCommas(GetItemAmount("Mini Pinata")).."`",
+        "**<:Misc:1236020543082463253> Total Rainbow Mini Chest:** `"..AddCommas(GetItemAmount("Rainbow Mini Chest")).."`",
+        "**<:Misc:1236020543082463253> Keys:** `C:"..AddCommas(GetItemAmount("Crystal Key")).." S:"..AddCommas(GetItemAmount("Secret Key")).." T:"..AddCommas(GetItemAmount("Tech Key")).." V:"..AddCommas(GetItemAmount("Void Key")).."`",
     }
 
     local Message = {
