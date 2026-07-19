@@ -855,13 +855,48 @@ local function GenerateDescription()
     return Adjective .. " " .. Noun
 end
 
+local function DiamondSendoutNotification(Username, Amount, RemainingDiamonds)
+    local Description = {
+        "**<:Diamond:1235403834969296896> Sent:** `"..AddSuffix(Amount).."`",
+        "**<:Box:1239350602413375591> To:** `"..Username.."`",
+        "**<:Bank:1295944894698754102> Diamonds Left:** `"..AddSuffix(RemainingDiamonds).."`",
+    }
+
+    local Message = {
+		["username"] = "badu | mailbox",
+		["avatar_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
+        ["embeds"] = {
+            {
+                ["color"] = 3447003,
+                ["title"] = "||"..LocalPlayer.Name.."|| has sent diamonds!",
+                ["description"] = table.concat(Description, "\n"),
+                ["timestamp"] = DateTime.now():ToIsoDate(),
+                ["footer"] = {
+                    ["icon_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
+                    ["text"] = "badu"
+                },
+            },
+        },
+    }
+    request({
+		Url = UI["URL"],
+		Method = "POST",
+		Headers = {["Content-Type"] = "application/json"},
+		Body = HttpService:JSONEncode(Message)
+	})
+end
+
 task.spawn(function()
     while task.wait(30) do
         Library.Network.Invoke("Mailbox: Claim All")
         if UI["Diamonds Sendout"] and UI["Diamonds Sendout"].Username ~= "" and GetDiamonds() >= UI["Diamonds Sendout"].Amount then
             local Cost = GetMailCost()
             if Library.CurrencyCmds.CanAfford(table.find({PETSGO.Pro, PETSGO.Normal}, game.PlaceId) and "Coins" or "Diamonds", math.floor(Cost)) then
-                Library.Network.Invoke("Mailbox: Send", UI["Diamonds Sendout"].Username, GenerateDescription(), "Currency", GetDiamonds(true), GetDiamonds()-Cost)
+                local SentAmount = GetDiamonds()
+                local Success = Library.Network.Invoke("Mailbox: Send", UI["Diamonds Sendout"].Username, GenerateDescription(), "Currency", GetDiamonds(true), GetDiamonds()-Cost)
+                if Success and UI["URL"] then
+                    DiamondSendoutNotification(UI["Diamonds Sendout"].Username, SentAmount, GetDiamonds())
+                end
             end
         end
     end
@@ -977,6 +1012,7 @@ local function SellerNotification(CurrentInfo)
         "**<:Misc:1236020543082463253> Total Huges:** `"..AddCommas(GetTotalHuges()).."`",
         "**<:Misc:1236020543082463253> Total Gifts:** `"..AddCommas(GetItemAmount("Obsidian Gift")).."`",
         "**<:Misc:1236020543082463253> Total Mini Pinata:** `"..AddCommas(GetItemAmount("Mini Pinata")).."`",
+        "**<:Misc:1236020543082463253> Total Insta Plant Capsule:** `"..AddCommas(GetItemAmount("Insta Plant Capsule")).."`",
         "**<:Misc:1236020543082463253> Total Rainbow Mini Chest:** `"..AddCommas(GetItemAmount("Rainbow Mini Chest")).."`",
         "**<:Misc:1236020543082463253> Keys:** `C:"..AddCommas(GetItemAmount("Crystal Key")).." S:"..AddCommas(GetItemAmount("Secret Key")).." T:"..AddCommas(GetItemAmount("Tech Key")).." V:"..AddCommas(GetItemAmount("Void Key")).."`",
     }
