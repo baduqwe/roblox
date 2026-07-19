@@ -139,7 +139,7 @@ repeat wait() until LibLoaded
 print("Library ready")
 
 print("Making UI")
-local Window = lib:CreateWindow("Paule & badu Tap Heroes", true)
+local Window = lib:CreateWindow("Tasty Tap Heroes", true)
 print("UI Window Created")
 local StatusStat = Window:AddStat("Status", "Idling")
 print("Status Stat Created")
@@ -165,10 +165,59 @@ local StartEggs = DataInventory.EggsHatched or 0
 local lastEquip = 0
 local keys = {}
 
--- Obsidian Gift takibi: AutoOpenGifts hediyeleri actigi icin envanterdeki sayi
--- inip cikiyor. Bu yuzden toplami "mevcut sayi" degil, ARTISLARI toplayarak buluyoruz.
-local LastGiftCount = tonumber(GetItem("Lootbox", "Obsidian Gift")) or 0
+-- Envanter sayaci (PlazaPlus'taki GetItemAmount ile ayni yontem):
+-- GetItem("Lootbox", ...) yanlis sinifa bakip 0 donebiliyordu. Bunun yerine
+-- envanterin TAMAMINI gezip id'si eslesen her yiginin "_am" adedini topluyoruz.
+local InventoryCmds
+do
+    -- 1) Bilinen yol (dump'ta dogrulandi)
+    pcall(function()
+        InventoryCmds = require(game:GetService("ReplicatedStorage").Library.Client.InventoryCmds)
+    end)
+    -- 2) Tutmazsa isimle ara (dumper'da ise yarayan yontem)
+    if not (type(InventoryCmds) == "table" and InventoryCmds.State) then
+        InventoryCmds = nil
+        local lib = game:GetService("ReplicatedStorage"):FindFirstChild("Library")
+        if lib then
+            for _, d in ipairs(lib:GetDescendants()) do
+                if d:IsA("ModuleScript") and d.Name == "InventoryCmds" then
+                    local ok, m = pcall(function() return require(d) end)
+                    if ok and type(m) == "table" and m.State then
+                        InventoryCmds = m
+                        break
+                    end
+                end
+            end
+        end
+    end
+    print("[GIFT] InventoryCmds:", InventoryCmds and "BULUNDU" or "YOK")
+end
+
+local function GetItemAmount(TargetId)
+    local Total = 0
+    local ok = pcall(function()
+        local State = InventoryCmds.State().container._store._byType
+        for _, Inventory in pairs(State) do
+            if Inventory and Inventory._byUID then
+                for _, ItemTable in pairs(Inventory._byUID) do
+                    local ItemId = ItemTable.GetId and ItemTable:GetId()
+                        or (ItemTable._data and ItemTable._data.id)
+                    if ItemId == TargetId then
+                        Total = Total + ((ItemTable._data and ItemTable._data["_am"]) or 1)
+                    end
+                end
+            end
+        end
+    end)
+    if not ok then return nil end
+    return Total
+end
+
+-- Obsidian Gift: ana sayi = hesaptaki mevcut adet, yanindaki = saatlik farm hizi.
+-- Hiz icin sadece ARTISLARI topluyoruz (acilinca dusen sayiyi farm sayma).
+local LastGiftCount = GetItemAmount("Obsidian Gift") or 0
 local TotalGiftsFarmed = 0
+print("[GIFT] Baslangic Obsidian Gift =", LastGiftCount)
 
 task.spawn(function()
     while task.wait() do
@@ -177,8 +226,8 @@ task.spawn(function()
         TimeEclapsedStat:Update(tostring(utils:FormatTime(now - startTime)))
         TotalEggsOpened:Update(utils:FormatNumber((DataInventory.EggsHatched or 0) - StartEggs))
 
-        -- Obsidian Gift: sadece artislari topla (acilinca dusen sayiyi sayma)
-        local curGifts = tonumber(GetItem("Lootbox", "Obsidian Gift"))
+        -- Obsidian Gift: mevcut adedi oku, artislari da hiz icin biriktir
+        local curGifts = GetItemAmount("Obsidian Gift")
         if curGifts then
             if curGifts > LastGiftCount then
                 TotalGiftsFarmed = TotalGiftsFarmed + (curGifts - LastGiftCount)
@@ -192,7 +241,7 @@ task.spawn(function()
             giftsPerHour = TotalGiftsFarmed / (elapsed / 3600)
         end
         ObsidianGiftStat:Update(
-            utils:FormatNumber(TotalGiftsFarmed)
+            utils:FormatNumber(LastGiftCount)
             .. " (+" .. utils:FormatNumber(math.floor(giftsPerHour)) .. "/hr)"
         )
 
