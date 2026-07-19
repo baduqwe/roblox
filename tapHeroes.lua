@@ -2445,9 +2445,9 @@ if (CurrentTranscends or 0) < (Config["Max Rebirths"] or 0) then
                         task.wait(0.1)
                         HatchNearest()
                     
-                        local remaining = math.max(0, 30 - math.floor(os.clock() - StartTimer))
+                        local remaining = math.max(0, 1 - math.floor(os.clock() - StartTimer))
                         StatusUpdate("Failed Defeating the boss retrying in: " .. remaining .. "s")
-                    until os.clock() - StartTimer > 30
+                    until os.clock() - StartTimer > 1
 
                     SetLevel(DataInventory.TapHeroes.MaxZone or 1)
                 else
@@ -2546,9 +2546,9 @@ if (DataInventory.TapHeroes.MaxZone or 1) <  (Config["Max Area"] or 0) then
                     task.wait(0.1)
                     HatchNearest()
                 
-                    local remaining = math.max(0, 30 - math.floor(os.clock() - StartTimer))
+                    local remaining = math.max(0, 1 - math.floor(os.clock() - StartTimer))
                     StatusUpdate("Failed Defeating the boss retrying in: " .. remaining .. "s")
-                until os.clock() - StartTimer > 30
+                until os.clock() - StartTimer > 1
 
                 SetLevel(DataInventory.TapHeroes.MaxZone or 1, false)
             else
