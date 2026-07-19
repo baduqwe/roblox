@@ -170,16 +170,27 @@ local keys = {}
 -- envanterin TAMAMINI gezip id'si eslesen her yiginin "_am" adedini topluyoruz.
 local InventoryCmds
 do
+    -- 1) Bilinen yol (dump'ta dogrulandi)
     pcall(function()
-        if Library and Library.InventoryCmds and Library.InventoryCmds.State then
-            InventoryCmds = Library.InventoryCmds
-        end
+        InventoryCmds = require(game:GetService("ReplicatedStorage").Library.Client.InventoryCmds)
     end)
-    if not InventoryCmds then
-        pcall(function()
-            InventoryCmds = require(game:GetService("ReplicatedStorage").Library.Client.InventoryCmds)
-        end)
+    -- 2) Tutmazsa isimle ara (dumper'da ise yarayan yontem)
+    if not (type(InventoryCmds) == "table" and InventoryCmds.State) then
+        InventoryCmds = nil
+        local lib = game:GetService("ReplicatedStorage"):FindFirstChild("Library")
+        if lib then
+            for _, d in ipairs(lib:GetDescendants()) do
+                if d:IsA("ModuleScript") and d.Name == "InventoryCmds" then
+                    local ok, m = pcall(function() return require(d) end)
+                    if ok and type(m) == "table" and m.State then
+                        InventoryCmds = m
+                        break
+                    end
+                end
+            end
+        end
     end
+    print("[GIFT] InventoryCmds:", InventoryCmds and "BULUNDU" or "YOK")
 end
 
 local function GetItemAmount(TargetId)
@@ -206,6 +217,7 @@ end
 -- Hiz icin sadece ARTISLARI topluyoruz (acilinca dusen sayiyi farm sayma).
 local LastGiftCount = GetItemAmount("Obsidian Gift") or 0
 local TotalGiftsFarmed = 0
+print("[GIFT] Baslangic Obsidian Gift =", LastGiftCount)
 
 task.spawn(function()
     while task.wait() do
