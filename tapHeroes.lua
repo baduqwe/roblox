@@ -34,9 +34,6 @@ until player:GetAttribute("__LOADED")
 local SetLevelRemote = nil
 local RebirthRemote = nil
 local MoveRemote = nil
--- Tap Heroes transcend/rebirth aksiyon remote'u. Eski kalipla dinamik bulunamadigi
--- icin sabit yaziyoruz (dump'ta TX_Post olarak tespit edildi). Oyun guncellenip
--- remote adi degisirse SADECE burayi guncelle.
 local TranscendRemote = "TX_Post"
 
 local InstancingCmds2 = require(game:GetService("ReplicatedStorage").Library.Client.InstancingCmds)
@@ -75,10 +72,6 @@ repeat
     end
     
     task.wait(2)
-    
-    -- (Transcend/rebirth butonuna basma kaldirildi: eskiden RebirthRemote'u
-    --  kesfetmek icindi; artik aksiyonu asagida butonla atesledigimiz icin
-    --  gereksiz ve baslangicta yanlislikla aksiyon attirabilir.)
     for _, obj in ipairs(getgc()) do
         if type(obj) == "function" then
             local source = debug.info(obj, "s")
@@ -139,7 +132,7 @@ repeat wait() until LibLoaded
 print("Library ready")
 
 print("Making UI")
-local Window = lib:CreateWindow("Tasty Tap Heroes", true)
+local Window = lib:CreateWindow("Paule & badu Tap Heroes", true)
 print("UI Window Created")
 local StatusStat = Window:AddStat("Status", "Idling")
 print("Status Stat Created")
