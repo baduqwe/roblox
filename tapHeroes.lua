@@ -34,6 +34,9 @@ until player:GetAttribute("__LOADED")
 local SetLevelRemote = nil
 local RebirthRemote = nil
 local MoveRemote = nil
+-- Tap Heroes transcend/rebirth aksiyon remote'u. Eski kalipla dinamik bulunamadigi
+-- icin sabit yaziyoruz (dump'ta TX_Post olarak tespit edildi). Oyun guncellenip
+-- remote adi degisirse SADECE burayi guncelle.
 local TranscendRemote = "TX_Post"
 
 local InstancingCmds2 = require(game:GetService("ReplicatedStorage").Library.Client.InstancingCmds)
@@ -72,6 +75,10 @@ repeat
     end
     
     task.wait(2)
+    
+    -- (Transcend/rebirth butonuna basma kaldirildi: eskiden RebirthRemote'u
+    --  kesfetmek icindi; artik aksiyonu asagida butonla atesledigimiz icin
+    --  gereksiz ve baslangicta yanlislikla aksiyon attirabilir.)
     for _, obj in ipairs(getgc()) do
         if type(obj) == "function" then
             local source = debug.info(obj, "s")
@@ -141,6 +148,7 @@ local HugeStat = Window:AddStat("Session Huges", "0/0")
 local TitanicStat = Window:AddStat("Session Titanics", "0/0")
 Window:AddSeperator()
 local TotalEggsOpened = Window:AddStat("Total Eggs Hatched", 0)
+local ObsidianGiftStat = Window:AddStat("Total Obsidian Gift", "0 (+0/hr)")
 local TimeEclapsedStat = Window:AddStat("Time Farmed", "00:00:00")
 Window:AddSeperator()
 local MarbleCoinStat = Window:AddStat("Current Marble Coins","0")
@@ -157,12 +165,37 @@ local StartEggs = DataInventory.EggsHatched or 0
 local lastEquip = 0
 local keys = {}
 
+-- Obsidian Gift takibi: AutoOpenGifts hediyeleri actigi icin envanterdeki sayi
+-- inip cikiyor. Bu yuzden toplami "mevcut sayi" degil, ARTISLARI toplayarak buluyoruz.
+local LastGiftCount = tonumber(GetItem("Lootbox", "Obsidian Gift")) or 0
+local TotalGiftsFarmed = 0
+
 task.spawn(function()
     while task.wait() do
         local now = os.clock()
 
         TimeEclapsedStat:Update(tostring(utils:FormatTime(now - startTime)))
         TotalEggsOpened:Update(utils:FormatNumber((DataInventory.EggsHatched or 0) - StartEggs))
+
+        -- Obsidian Gift: sadece artislari topla (acilinca dusen sayiyi sayma)
+        local curGifts = tonumber(GetItem("Lootbox", "Obsidian Gift"))
+        if curGifts then
+            if curGifts > LastGiftCount then
+                TotalGiftsFarmed = TotalGiftsFarmed + (curGifts - LastGiftCount)
+            end
+            LastGiftCount = curGifts
+        end
+
+        local elapsed = now - startTime
+        local giftsPerHour = 0
+        if elapsed >= 1 then
+            giftsPerHour = TotalGiftsFarmed / (elapsed / 3600)
+        end
+        ObsidianGiftStat:Update(
+            utils:FormatNumber(TotalGiftsFarmed)
+            .. " (+" .. utils:FormatNumber(math.floor(giftsPerHour)) .. "/hr)"
+        )
+
         HugeStat:Update(tostring(sessionHuges or 0))
         TitanicStat:Update(tostring(sessionTitans or 0))
         MarbleCoinStat:Update(utils:FormatNumber(GetItem("Currency", "MarbleCoins")))
@@ -2476,9 +2509,9 @@ if (CurrentTranscends or 0) < (Config["Max Rebirths"] or 0) then
                         task.wait(0.1)
                         HatchNearest()
                     
-                        local remaining = math.max(0, 1 - math.floor(os.clock() - StartTimer))
+                        local remaining = math.max(0, 30 - math.floor(os.clock() - StartTimer))
                         StatusUpdate("Failed Defeating the boss retrying in: " .. remaining .. "s")
-                    until os.clock() - StartTimer > 1
+                    until os.clock() - StartTimer > 30
 
                     SetLevel(DataInventory.TapHeroes.MaxZone or 1)
                 else
@@ -2577,9 +2610,9 @@ if (DataInventory.TapHeroes.MaxZone or 1) <  (Config["Max Area"] or 0) then
                     task.wait(0.1)
                     HatchNearest()
                 
-                    local remaining = math.max(0, 1 - math.floor(os.clock() - StartTimer))
+                    local remaining = math.max(0, 30 - math.floor(os.clock() - StartTimer))
                     StatusUpdate("Failed Defeating the boss retrying in: " .. remaining .. "s")
-                until os.clock() - StartTimer > 1
+                until os.clock() - StartTimer > 30
 
                 SetLevel(DataInventory.TapHeroes.MaxZone or 1, false)
             else
@@ -2658,9 +2691,9 @@ while task.wait(0.1) do
                 task.wait(0.1)
                 HatchNearest()
             
-                local remaining = math.max(0, 1 - math.floor(os.clock() - StartTimer))
+                local remaining = math.max(0, 30 - math.floor(os.clock() - StartTimer))
                 StatusUpdate("Failed Defeating the boss retrying in: " .. remaining .. "s")
-            until os.clock() - StartTimer > 1
+            until os.clock() - StartTimer > 30
             SetLevel(currentZone or 1, false)
         else
             SetLevel(currentZone or 1, false)
