@@ -1,2753 +1,1742 @@
-print("Loading Backrooms LOL")
-_G.TpWorkspace = true
-if not LPH_OBFUSCATED then
--- NEVER MENTION STUFF IN LPH_OBFUSCATED
-_G.Debug = false
-
-loadstring([[
-    function LPH_NO_VIRTUALIZE(f) return f end;
-]])();
-
-
+local timer = tick()
+if not game:IsLoaded() then
+    game.Loaded:Wait()
 end
 
-if _G.Started or game.CoreGui:FindFirstChild("HastyLib") then
+local PS99 = {Pro = 15588442388, Normal = 15502339080}
+local PETSGO = {Pro = 133783083257328, Normal = 19006211286}
+
+local StartingTime = os.time()
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local LogService = game:GetService("LogService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+repeat task.wait()
+    LocalPlayer = Players.LocalPlayer
+until LocalPlayer and LocalPlayer.GetAttribute and LocalPlayer:GetAttribute("__LOADED")
+if not LocalPlayer.Character then
+    LocalPlayer.CharacterAdded:Wait()
+end
+local HumanoidRootPart = LocalPlayer.Character.HumanoidRootPart
+
+--// GLOBAL
+local NLibrary = ReplicatedStorage.Library
+local PlayerSave = require(NLibrary.Client.Save)
+local TradingPlazaCmds = require(NLibrary.Client.TradingPlazaCmds)
+local Abstract = require(NLibrary.Items.AbstractItem)
+local Types = require(NLibrary.Items.Types)
+local ParseAssetId = require(NLibrary.Functions.ParseAssetId)
+local Directory = require(NLibrary.Directory)
+local PlayerScripts = LocalPlayer.PlayerScripts.Scripts
+local Rarities = table.clone(require(NLibrary.Directory.Rarity))
+local Mailbox = require(NLibrary.Types.Mailbox)
+--// PS99
+if table.find({PS99.Normal, PS99.Pro}, game.PlaceId) then
+    if #TradingPlazaCmds.GetAvailable() > 1 then
+        CanUsePro = true
+    end
+    Constants = require(NLibrary.Balancing.Constants)
+end
+
+
+--// PETS GO
+if table.find({PETSGO.Normal, PETSGO.Pro}, game.PlaceId) then
+    UpgradeCmds = require(NLibrary.Client.UpgradeCmds)
+    Variables = require(NLibrary.Shared.Variables)
+end
+
+local LoadModules = function(Path, LoadTable)
+    for _,v in next, Path:GetChildren() do
+        if v:IsA("ModuleScript") and not v:GetAttribute("NOLOAD") then
+            local Status, Module = pcall(require, v)
+            if Status then
+                LoadTable[v.Name] = Module
+            end
+        end
+    end
+end
+if not getgenv().Library then
+    getgenv().Library = {}
+    LoadModules(NLibrary.Client, getgenv().Library)
+    LoadModules(NLibrary, getgenv().Library)
+end
+
+local Booths, ClaimedBooths, BoothsInteractive, Interacts
+if table.find({PS99.Pro, PS99.Normal, PETSGO.Normal, PETSGO.Pro}, game.PlaceId) then
+    repeat task.wait()
+        Booths = getsenv(NLibrary.Client:FindFirstChild("BoothCmds") or LocalPlayer.PlayerScripts.Scripts.Game["Trading Plaza"]["Booths Frontend"]).getState
+    until Booths
+    Booths = getupvalues(Booths)
+    repeat task.wait()
+        Interacts = getsenv(NLibrary.Client:FindFirstChild("BoothCmds") or LocalPlayer.PlayerScripts.Scripts.Game["Trading Plaza"]["Booths Frontend"]).updateAllInteracts
+    until Interacts
+    ClaimedBooths = getupvalues(Interacts)[1]
+    BoothsInteractive = getupvalues(Interacts)[3]
+end
+
+
+--// File Setup
+local DefaultSettings = {Sniper = false, Seller = false}
+local FileSettings = {}
+local OGFileSettings = {}
+local FolderPath = "badu/" .. (table.find({PETSGO.Normal, PETSGO.Pro}, game.PlaceId) and "PETS GO" or "Pet Simulator 99")
+local FileName = FolderPath .. "/" .. LocalPlayer.Name .. " Plaza Plus.cfg"
+if not isfolder("badu") then makefolder("badu") end
+if not isfolder(FolderPath) then makefolder(FolderPath) end
+if not isfile(FileName) then writefile(FileName, HttpService:JSONEncode(DefaultSettings)) end
+local function LoadSettings()
+    local success, result = pcall(function()
+        local content = readfile(FileName)
+        return HttpService:JSONDecode(content)
+    end)
+    if success and typeof(result) == "table" then
+        return result
+    else
+        writefile(FileName, HttpService:JSONEncode(DefaultSettings))
+        return DefaultSettings
+    end
+end
+OGFileSettings = LoadSettings()
+local function Save()
+    writefile(FileName, HttpService:JSONEncode(OGFileSettings))
+end
+setmetatable(FileSettings, {
+    __index = OGFileSettings,
+    __newindex = function(_, key, value)
+        if OGFileSettings[key] ~= value then
+            OGFileSettings[key] = value
+            Save()
+        end
+    end
+})
+
+local SuffixesLower = {"k", "m", "b", "t"}
+local SuffixesUpper = {"K", "M", "B", "T"}
+local function AddSuffix(Amount)
+    if not Amount or type(Amount) ~= "number" then
+        return "UNKNOWN"
+    end
+    if Amount == 0 then
+        return "0"
+    end
+    local IsNegative = Amount < 0
+    Amount = math.abs(Amount)
+    local a = math.floor(math.log(Amount, 1e3))
+    local b = math.pow(10, a * 3)
+    return (IsNegative and "-" or "")..("%.2f"):format(Amount / b):gsub("%.?0+$", "") .. (SuffixesLower[a] or "")
+end
+local function RemoveSuffix(Amount)
+	local a, Suffix = Amount:gsub("%a", ""), Amount:match("%a")
+	local b = table.find(SuffixesUpper, Suffix) or table.find(SuffixesLower, Suffix) or 0
+	return tonumber(a) * math.pow(10, b * 3)
+end
+
+local function RemoveSuffix(Amount)
+	local Number, Suffix = Amount:gsub("%a", ""), Amount:match("%a")
+	local Type = table.find(SuffixesUpper, Suffix) or table.find(SuffixesLower, Suffix) or 0
+	return tonumber(Number) * math.pow(10, Type * 3)
+end
+
+local UI = {}
+local function SetUISettings(Type)
+    for Name, Params in next, Type do
+        if type(Params) ~= "table" then continue end
+        if Name == "Switch Servers" and Params.Active then
+            UI["Switch Servers"] = true
+            UI["Teleport Delay"] = Params.SecondDelay or Params.MinuteDelay and Params.MinuteDelay*60
+            UI["Only Pro"] = Params.OnlyPRO
+        end
+        if Name == "Webhook" and Params.Active and Params.URL ~= "" then
+            UI["URL"] = Params.URL
+        end
+        if Name == "Kill Switch" then
+            for InsideName, Value in next, Params do
+                if not Value then continue end
+                if InsideName:find("Switch To") then
+                    UI["Switch To "..InsideName:split("To ")[2]] = Value
+                elseif InsideName:find("Minutes Timer") then
+                    UI["Minutes Timer"] = tonumber(InsideName:split(" Minutes")[1])*60
+                elseif InsideName:find("Diamonds Hit") then
+                    UI["Diamonds Hit"] = RemoveSuffix(InsideName:split("Diamonds Hit: ")[2])
+                else
+                    UI[InsideName] = Value
+                end
+            end
+        end
+        if Name == "Diamonds Sendout" and Params.Active then
+            UI["Diamonds Sendout"] = {Username = Params.Username, Amount = RemoveSuffix(Params.Amount), WebhookGem = Params.WebhookGem}
+        end
+    end
+end
+if (Settings.Sniper and Settings.Sniper.Active) and (Settings.Seller and Settings.Seller.Active) and not (FileSettings.Sniper or FileSettings.Seller) then
+    FileSettings.Sniper = true
+end
+if (Settings.Sniper and Settings.Sniper.Active) and (Settings.Seller and not Settings.Seller.Active) or not Settings.Seller then
+    FileSettings.Sniper = true
+elseif (Settings.Seller and Settings.Seller.Active) and (Settings.Sniper and not Settings.Sniper.Active) or not Settings.Sniper then
+    FileSettings.Seller = true
+end
+if Settings.Sniper and Settings.Sniper.Active and FileSettings.Sniper then
+    SetUISettings(Settings.Sniper)
+end
+if Settings.Seller and Settings.Seller.Active and FileSettings.Seller then
+    SetUISettings(Settings.Seller)
+end
+
+local function ColorizeConsole()
+    local Console = CoreGui:FindFirstChild("DevConsoleMaster", true)
+    if not Console then return end
+    local ClientLog = Console:FindFirstChild("ClientLog", true)
+    if not ClientLog then return end
+    for _, Frame in ipairs(ClientLog:GetChildren()) do
+        if Frame:IsA("Frame") then
+            local Label = Frame:FindFirstChildOfClass("TextLabel")
+            if Label and not Frame:GetAttribute("Colorized") then
+                Label.RichText = true
+                local Text = Label.Text
+                if not Text:find("<font") then
+                    Text = Text:gsub("(Found:%s*)(.-)@", function(found, itemName)
+                        return found .. "<font color='rgb(230, 215, 123)'>" .. itemName .. "</font> @"
+                    end)
+                    Text = Text:gsub("Found", "<font color='rgb(212, 153, 230)'>Found</font>")
+                    Text = Text:gsub("(%d+%.?%d*)%% (ABOVE RAP)", function(percent)
+                        return "<font color='rgb(207, 94, 94)'>" .. percent .. "% ABOVE RAP</font>"
+                    end)
+                    Text = Text:gsub("(%d+%.?%d*)%% (BELOW RAP)", function(percent)
+                        return "<font color='rgb(65, 223, 65)'>" .. percent .. "% BELOW RAP</font>"
+                    end)
+                    Text = Text:gsub("Manipulated", "<font color='rgb(230, 70, 70)'>Manipulated</font>")
+                    Text = Text:gsub("(Sniping:)( x%d+%s*)([^\n]*)", function(sniping, count, itemName)
+                        return "<font color='rgb(33, 239, 253)'>" .. sniping .. "</font>" ..
+                               "<font color='rgb(230, 215, 123)'>" .. count .. itemName .. "</font>"
+                    end)
+                    Label.Text = Text
+                end
+                Frame:SetAttribute("Colorized", true)
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while task.wait() do
+        ColorizeConsole()
+    end
+end)
+
+if PlayerScripts.Core["Server Closing"] then
+    PlayerScripts.Core["Server Closing"].Enabled = false
+end
+if PlayerScripts.Core["Idle Tracking"] then
+    PlayerScripts.Core["Idle Tracking"].Enabled = false
+end
+Library.Network.Fire("Idle Tracking: Stop Timer")
+LocalPlayer.Idled:Connect(function()
+    game:GetService("VirtualUser"):Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+    game:GetService("VirtualUser"):Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+end)
+
+--// Some Misc Functions \\--
+local RomanNumerals = {
+    I = 1, V = 5, X = 10, L = 50, C = 100, D = 500, M = 1000
+}
+local function ConvertRoman(Number)
+    local result = ""
+    local sortedNumerals = {}
+    for k, v in pairs(RomanNumerals) do
+        table.insert(sortedNumerals, {v, k})
+    end
+    table.sort(sortedNumerals, function(a, b) return a[1] > b[1] end)
+
+    for _, value in ipairs(sortedNumerals) do
+        while Number >= value[1] do
+            result = result .. value[2]
+            Number = Number - value[1]
+        end
+    end
+
+    return result
+end
+local function ConvertNumerals(Roman)
+    local Total = 0
+    local OldValue = 0
+    for i = #Roman, 1, -1 do
+        local CurrentValue = RomanNumerals[Roman:sub(i, i)]
+        if CurrentValue < OldValue then
+            Total = Total - CurrentValue
+        else
+            Total = Total + CurrentValue
+        end
+        OldValue = CurrentValue
+    end
+    return Total
+end
+local function AddCommas(Amount)
+    local SuffixAdd = Amount
+    while task.wait() do
+        SuffixAdd, b = string.gsub(SuffixAdd, "^(-?%d+)(%d%d%d)", '%1,%2')
+        if (b == 0) then
+            break
+        end
+    end
+    return SuffixAdd
+end
+local TempClasses = require(NLibrary.Items.Types).Types
+local Classes = {}
+for Name, Junk in next, TempClasses do
+    Classes[Name] = {}
+end
+Classes.Currency = nil
+Classes.Page = nil
+local ItemList = Classes
+local DirectoryClasses = {}
+for Name, Info in next, Classes do
+    Continue = false
+    for _, Class in next, NLibrary.Directory:GetChildren() do
+        if tostring(Class):find(Name) then
+            Continue = true
+        end
+    end
+    if not Continue then
+        Classes[Name] = nil
+        continue
+    end
+    if Name == "Misc" or Name == "Card" then
+        DirectoryClasses[Name] = Name.."Items"
+    elseif Name == "Lootbox" or Name == "Box" then
+        DirectoryClasses[Name] = Name.."es"
+    else
+        DirectoryClasses[Name] = Name.."s"
+    end
+end
+    for Class, Info in next, Classes do
+        pcall(function()
+            for Item, Info in next, require(NLibrary.Directory[DirectoryClasses[Class]]) do
+            if Info.DisplayName and type(Info.DisplayName) == "function" then
+                for i = Info.BaseTier, Info.MaxTier do
+                    ItemList[Class][Info.DisplayName(i)] =
+                    {
+                        ["ID"] = Item,
+                        ["Display"] = Info.DisplayName(i),
+                        ["Power"] = Info.Power(i),
+                        ["Rarity"] = Info.Rarity(i),
+                        ["Tier"] = i,
+                        ["Icon"] = type(Info.Icon) == "function" and Info.Icon(i) or Info.Icon
+                    }
+                end
+            else
+                if Info.Tiers then
+                    for i = 1, #Info.Tiers do
+                        Display, Icon, Rarity, Power = nil
+                        if Info.Tiers[i].Effect and Info.Tiers[i].Effect.Type.Tiers[i] then
+                            if Info.Tiers[i].Effect.Type.Tiers[i].Name then
+                                Display = Info.Tiers[i].Effect.Type.Tiers[i].Name
+                            else
+                                Display = (Info.DisplayName and type(Info.Displayname) ~= "function" and Info.DisplayName) or (Info.name and type(Info.name) ~= "function" and Info.name) or (Info.Name and type(Info.Name) ~= "function" and Info.Name) or (Info.DisplayName and type(Info.DisplayName) == "function" and Info.DisplayName(i))
+                                if (not Display:find("%d") or not Display:find("(%u+)$")) and #Info.Tiers > 1 then
+                                    Display = Display.." "..ConvertRoman(i)
+                                end
+                            end
+                            Icon = Info.Tiers[i].Effect.Type.Tiers[i].Icon
+                            Rarity = Info.Tiers[i].Effect.Type.Tiers[i].Rarity
+                            Power = Info.Tiers[i].Effect.Type.Tiers[i].Power
+                        else
+                            Display = (Info.DisplayName and type(Info.Displayname) ~= "function" and Info.DisplayName) or (Info.name and type(Info.name) ~= "function" and Info.name) or (Info.Name and type(Info.Name) ~= "function" and Info.Name) or (Info.DisplayName and type(Info.DisplayName) == "function" and Info.DisplayName(i))
+                            if (not Display:find("%d") or not Display:find("(%u+)$")) and #Info.Tiers > 1 then
+                                Display = Display.." "..ConvertRoman(i)
+                            end
+                        end
+                        ItemList[Class][Display] =
+                        {
+                            ["ID"] = Item,
+                            ["Display"] = Display,
+                            ["Tier"] = i,
+                            ["Icon"] = Info.Tiers[i].Icon or Icon,
+                            ["Power"] = Info.Tiers[i].Power or Power,
+                            ["Rarity"] = Info.Tiers[i].Rarity or Rarity,
+                        }
+                    end
+                else
+                    if Info.instant_purchase then continue end
+                    ItemList[Class][(Info.DisplayName and type(Info.Displayname) ~= "function" and Info.DisplayName) or (Info.name and type(Info.name) ~= "function" and Info.name) or (Info.Name and type(Info.Name) ~= "function" and Info.Name) or (Info.DisplayName and type(Info.DisplayName) == "function" and Info.DisplayName(1))] =
+                    {
+                        ["ID"] = Item,
+                        ["Display"] = (Info.DisplayName and type(Info.Displayname) ~= "function" and Info.DisplayName) or (Info.name and type(Info.name) ~= "function" and Info.name) or (Info.Name and type(Info.Name) ~= "function" and Info.Name) or (Info.DisplayName and type(Info.DisplayName) == "function" and Info.DisplayName(1)),
+                        ["Tier"] = Info.Tier,
+                        ["Icon"] = Info.Icon or Info.thumbnail,
+                        ["Power"] = Info.Power,
+                        ["Rarity"] = Info.Rarity,
+                    }
+
+                end
+            end
+        end
+    end)
+end
+
+local IDs = {}
+local function GrabIDs(PlaceId)
+    if UI["Only Pro"] and CanUsePro then
+        if table.find({PETSGO.Pro, PETSGO.Normal}, game.PlaceId) then
+            PlaceId = PETSGO.Pro
+        elseif table.find({PS99.Pro, PS99.Normal}, game.PlaceId) then
+            PlaceId = PS99.Pro
+        end
+    else
+        if table.find({PETSGO.Pro, PETSGO.Normal}, game.PlaceId) then
+            PlaceId = CanUsePro and PETSGO[math.random(1,2)] or PETSGO.Normal
+        elseif table.find({PS99.Pro, PS99.Normal}, game.PlaceId) then
+            PlaceId = CanUsePro and PS99[math.random(1,2)] or PS99.Normal
+        end
+    end
+    if FileSettings.CanJoinServers then
+        local Servers = FileSettings.CanJoinServers
+        for Name, Server in next, Servers do
+            if type(Server) ~= "table" then continue end
+            table.insert(IDs, {PlaceID = Server.PlaceID, JobID = Server.JobID})
+        end
+        if Servers.HaveJoined >= 5 or (os.time() - Servers.Time) >= 300 then
+            Servers = nil
+        else
+            Servers.HaveJoined = Servers.HaveJoined + 1
+        end
+        FileSettings.CanJoinServers = Servers
+        return Save()
+    end
+    local Site, Cursor
+    local Url = string.format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Desc&limit=100", PlaceId or game.PlaceId)
+    if Cursor then
+        Url = Url .. "&cursor=" .. Cursor
+    end
+    local Success, Response = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(Url))
+    end)
+    if not Success or not Response then
+        task.wait(5)
+        return GrabIDs(PlaceId)
+    end
+    Site = Response
+    Cursor = Site.nextPageCursor
+    if Cursor == "null" or not Cursor then
+        Cursor = nil
+    end
+    if Site.data then
+        for _,Server in next, Site.data do
+            if Server.maxPlayers > Server.playing and Server.id ~= game.JobId and Server.playing >= (FileSettings.Sniper and 5 or 15) then
+                table.insert(IDs, {PlaceID = PlaceId or game.PlaceId, JobID = Server.id})
+            end
+        end
+    elseif Site.errors and Site.errors[1] and Site.errors[1].message == "Too many requests" then
+        warn("[Plaza Plus]: Roblox is rate-limiting you... waiting 15 seconds.")
+        task.wait(15)
+        return GrabIDs(PlaceId)
+    end
+    FileSettings.Servers = {
+        HaveJoined = 1,
+        Time = os.time(),
+        IDs
+    }
+    return Save()
+end
+local function Serverhop(NotPlaza)
+    repeat task.wait() until (((os.time() - StartingTime) >= UI["Teleport Delay"]) or NotPlaza) and #IDs >= 1
+    while task.wait() do
+        local RandomServer = IDs[Random.new():NextInteger(1, #IDs)]
+        if not FileSettings.LastJoinedServers then
+            FileSettings.LastJoinedServers = {}
+        end
+        local Servers = FileSettings.LastJoinedServers
+        if table.find(Servers, RandomServer.JobID) then
+            continue
+        end
+        if #Servers >= 7 then
+            table.remove(Servers, table.find(Servers, Servers[1]))
+        end
+        table.insert(Servers, RandomServer.JobID)
+        FileSettings.LastJoinedServers = Servers
+        Save()
+
+        TeleportService:TeleportToPlaceInstance(RandomServer.PlaceID, RandomServer.JobID, LocalPlayer)
+		task.wait(1.5)
+    end
+end
+if not table.find({PS99.Normal, PS99.Pro, PETSGO.Normal, PETSGO.Pro}, game.PlaceId) then
+    warn("[Plaza Plus]: Incorrect Server, serverhopping...")
+    while task.wait() do
+        task.spawn(function()
+            Library.Network.Invoke("Travel to Trading Plaza")
+        end)
+        task.wait(5)
+    end
     return
 end
-
-_G.IsTasty=true
-_G.Started = true
-_G.Soccer = true
-
-repeat task.wait(0.1) until game:IsLoaded()
-local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
-local CollectionService = game:GetService("CollectionService")
-local TeleportService = game:GetService("TeleportService")
-
-local player = Players.LocalPlayer
-repeat task.wait(0.1) until player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-repeat
-    task.wait(0.1)
-until player:GetAttribute("__LOADED")
-
-local SetLevelRemote = nil
-local RebirthRemote = nil
-local MoveRemote = nil
--- Tap Heroes transcend/rebirth aksiyon remote'u. Eski kalipla dinamik bulunamadigi
--- icin sabit yaziyoruz (dump'ta TX_Post olarak tespit edildi). Oyun guncellenip
--- remote adi degisirse SADECE burayi guncelle.
-local TranscendRemote = "TX_Post"
-
-local InstancingCmds2 = require(game:GetService("ReplicatedStorage").Library.Client.InstancingCmds)
-local Message = require(game.ReplicatedStorage.Library.Client.Message)
+task.spawn(function()
+    if UI["Teleport Delay"] then
+        while task.wait(UI["Teleport Delay"] + 120) and UI["Switch Servers"] and FileSettings.Sniper do
+            warn("[Plaza Plus]: +120s delay override, serverhopping...")
+            GrabIDs()
+            Serverhop()
+        end
+    end
+end)
 
 
-if InstancingCmds2.GetInstanceID() ~= "TapHeroes" then
-    InstancingCmds2.Enter("TapHeroes")
+
+
+local function ValidateItem(BoothItem, WantedItem)
+    if WantedItem.ID:find("All Huges") then
+        if not BoothItem.IsHuge then
+            return false
+        end
+    elseif WantedItem.ID:find("All Titanics") then
+        if not BoothItem.IsTitanic then
+            return false
+        end
+    elseif WantedItem.ID:find("All Exclusives") then
+        if (not BoothItem.IsExclusive or BoothItem.IsHuge or BoothItem.IsTitanic) or BoothItem.Class ~= "Pet" then
+            return false
+        end
+    end
+
+    if WantedItem.ID:find("All Rarity") then
+        if not BoothItem.Rarity or (BoothItem.Rarity:gsub(" ", "") ~= WantedItem.ID:split(":")[2]:gsub(" ", "") or BoothItem.IsHuge or BoothItem.IsTitanic) or BoothItem.Class ~= "Pet" then
+            return false
+        end
+    elseif WantedItem.ID:find("All Class") then
+        if not BoothItem.Class or (BoothItem.Class ~= WantedItem.ID:split(":")[2]:gsub(" ", "")) then
+            return false
+        end
+    elseif WantedItem.ID:find("RAP Above") then
+        if not BoothItem.RAP or (tonumber(BoothItem.RAP) < tonumber(RemoveSuffix(WantedItem.ID:split(":")[2]:gsub(" ", "")))) then
+            return false
+        end
+    elseif WantedItem.ID:find("Difficulty Above") then
+        if not BoothItem.Difficulty or (BoothItem.Difficulty and tonumber(BoothItem.Difficulty) < tonumber(RemoveSuffix(WantedItem.ID:split(":")[2]:gsub(" ", "")))) then
+            return false
+        end
+    elseif WantedItem.ID:find("Name Find") then
+        local Match = WantedItem.ID:split(": ")[2]
+        if not BoothItem.ID:find(Match) then
+            return false
+        end
+    elseif WantedItem.ID ~= BoothItem.ID and not WantedItem.ID:find("All ") then
+        return false
+    end
+
+    if WantedItem.Class ~= nil and WantedItem.Class ~= BoothItem.Class then
+        return false
+    end
+
+    if not WantedItem.AllTypes then
+        if (WantedItem.Shiny and not BoothItem.Shiny) or (not WantedItem.Shiny and BoothItem.Shiny) then
+            return false
+        end
+        if (WantedItem.Rainbow and not BoothItem.Rainbow) or (BoothItem.Rainbow and not WantedItem.Rainbow) then
+            return false
+        end
+        if (WantedItem.Golden and not BoothItem.Golden) or (BoothItem.Golden and not WantedItem.Golden) then
+            return false
+        end
+    end
+
+    if not WantedItem.AllTiers and (WantedItem.Tier and BoothItem.Tier) then
+        if tonumber(WantedItem.Tier) ~= tonumber(BoothItem.Tier) then
+            return false
+        end
+    end
+    return true
 end
 
-repeat
-    task.wait(0.2)
-until InstancingCmds2.GetInstanceID() == "TapHeroes"
+local function GenerateFindInfo(Name, Data)
+    local FindInfo = {Class, Rainbow, Golden, Shiny, Tier, ID, Display, AllTypes}
+    FindInfo.ID = Name
+    FindInfo.AllTypes = Data and Data.AllTypes and Data.AllTypes or nil
+    FindInfo.AllTiers = Data and Data.AllTiers and Datal.AllTiers or nil
 
-
-repeat
-    for _, obj in ipairs(getgc()) do
-        if type(obj) == "function" then
-            local source = debug.info(obj, "s")
-        
-            if source and source:find("ClientModule") then
-                local consts = debug.getconstants(obj)
-            
-                if #consts == 2 then
-                    if consts[2] == "FireCustom" then
-                        SetLevelRemote = consts[1]
-                    end
-                end
-                if debug.info(obj, "l") == 798 then
-                    debug.setupvalue(require(workspace.__THINGS.__INSTANCE_CONTAINER.Active.TapHeroes.ClientModule).OnJoin,11,false)
-                    task.wait(0.1)
-                    obj()
+    if not Name:find("Board") and not Name:find("Gem") then
+        local RainbowPosition = Name:find("Rainbow")
+        local HugePosition = Name:find("Huge")
+        FindInfo.Rainbow = (RainbowPosition and (not HugePosition or RainbowPosition < HugePosition)) and true
+        FindInfo.Golden = Name:find("Golden") and true
+        FindInfo.Shiny = Name:find("Shiny") and true
+        Name = FindInfo.ID:gsub((FindInfo.Rainbow and "Rainbow " or FindInfo.Golden and "Golden ") or "", ""):gsub(FindInfo.Shiny and "Shiny " or "", "")
+    end
+    if Name:find("RAP Above") or Name:find("Difficulty Above") then
+        return FindInfo
+    end
+    local Main, Tier = Name:match("(.+)%s+(%d+)%s*$")
+    if Tier then
+        FindInfo.Tier = tonumber(Tier)
+        Name = Main.." "..ConvertRoman(FindInfo.Tier)
+    elseif Name:find("(%u+)%s*$") then
+        FindInfo.Tier = tonumber(ConvertNumerals(Name:match("(%u+)%s*$")))
+    end
+    FindInfo.Display = Name
+    for Class, List in next, ItemList do
+        if ItemList[Class][Name] then
+            Data = ItemList[Class][Name]
+            FindInfo.Class = Class
+            FindInfo.ID = Data.ID
+            FindInfo.Icon = Data.Icon
+            if Class ~= "Pet" and Class ~= "Hoverboard" and Class ~= "Card" and Class ~= "Fruit" then
+                FindInfo.Rainbow = nil
+                FindInfo.Golden = nil
+                FindInfo.Shiny = nil
+                if Data.Tier and not FindInfo.Tier then
+                    FindInfo.Tier = Data.Tier
                 end
             end
+            break
         end
     end
-    
-    task.wait(2)
-    
-    -- (Transcend/rebirth butonuna basma kaldirildi: eskiden RebirthRemote'u
-    --  kesfetmek icindi; artik aksiyonu asagida butonla atesledigimiz icin
-    --  gereksiz ve baslangicta yanlislikla aksiyon attirabilir.)
-    for _, obj in ipairs(getgc()) do
-        if type(obj) == "function" then
-            local source = debug.info(obj, "s")
-        
-            if source and source:find("ClientModule") then
-                local consts = debug.getconstants(obj)
-                
-                if #consts == 6 and consts[6] == "FireCustom" then
-                    RebirthRemote = consts[5]
-                end
-            
-                if consts[4] == "FireCustom" and consts[6] == "InvokeCustom" then
-                    MoveRemote = consts[5]
-                end
-            end
+    return FindInfo
+end
+
+
+local function CalculatePercent(GlobalRAP, ItemPrice)
+    local WholeValue = ((ItemPrice - GlobalRAP) / GlobalRAP) * 100
+    WholeValue = math.floor(WholeValue * 2 + 0.5) / 2
+    return WholeValue < 0 and math.abs(WholeValue) or WholeValue * -1
+end
+
+local function GetDiamonds(ReturnUID)
+    for i,v in next, PlayerSave.Get()["Inventory"].Currency do
+        if v.id == "Diamonds" then
+            return ReturnUID and i or (v._am or 0)
         end
     end
-    print(SetLevelRemote,RebirthRemote,MoveRemote)
-    task.wait(1)
-until SetLevelRemote and MoveRemote
+    return 0
+end
 
-
-InstancingCmds2.Leave()
-
-setthreadidentity(8)
-task.wait(0.1)
-local Character = player.Character or player.CharacterAdded:Wait()
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-local random = Random.new()
-
-if not LibLoaded then
-    local data = nil
-    script_key = "aNSJkYrsHKaMrbCNUCnFSOtHHOMcblSU";
-    repeat
-        local success, response = pcall(function()
-            return request({
-                Url = "https://api.luarmor.net/files/v4/loaders/9ea51616f5d249bc4c77a976aae4aa2c.lua",
-                Method = "GET"
-            })
-        end)
-        if success and response and response.Body then
-            data = response.Body
+local MANIPULATION_THRESHOLD = 10
+local function ReturnDaily(Data)
+    local DayStart = os.time() - (24 * 60 * 60)
+    local Average = {}
+    for i = #Data, 1, -1 do
+        if Data[i][1] / 1000 >= DayStart then
+            table.insert(Average, Data[i])
         else
-            warn("Request failed, retrying...")
+            break
         end
-        print(type(data))
-        task.wait(2)
-    until type(data) == "string"
-    print("[AutoRank] Library response loaded")
-    task.spawn(function()
-        loadstring(data)()
-    end)
+    end
+    return Average
+end
+local function CalcAverageRap(Data, n)
+    local sum = 0
+    local count = math.min(#Data, n)
+    for i = #Data, #Data - count + 1, -1 do
+        sum = sum + Data[i][2]
+    end
+    return sum / count
+end
+local function DetermineTrend(Data)
+    if #Data <= 1 then
+        return "Unknown"
+    end
+    local CurrentRAP = Data[#Data][2]
+    local Daily = ReturnDaily(Data)
+    local StartingRAP = (Daily[#Daily] and Daily[#Daily][2]) or CurrentRAP
+    local AvgRAP = CalcAverageRap(Data, 30)
+    local deviation = ((CurrentRAP - AvgRAP) / math.max(AvgRAP, 1)) * 100
+    if math.abs(deviation) > MANIPULATION_THRESHOLD then
+        return "Manipulated"
+    end
+    if math.abs(CurrentRAP - StartingRAP) <= 0.1 * StartingRAP then
+        return "Stable"
+    elseif CurrentRAP > StartingRAP then
+        return "Increasing"
+    else
+        return "Decreasing"
+    end
 end
 
-
-print("Waiting for library")
-repeat wait() until LibLoaded
-print("Library ready")
-
-print("Making UI")
-local Window = lib:CreateWindow("Tasty Tap Heroes", true)
-print("UI Window Created")
-local StatusStat = Window:AddStat("Status", "Idling")
-print("Status Stat Created")
-Window:AddSeperator()
-local HugeStat = Window:AddStat("Session Huges", "0/0")
-local TitanicStat = Window:AddStat("Session Titanics", "0/0")
-Window:AddSeperator()
-local TotalEggsOpened = Window:AddStat("Total Eggs Hatched", 0)
-local ObsidianGiftStat = Window:AddStat("Total Obsidian Gift", "0 (+0/hr)")
-local TimeEclapsedStat = Window:AddStat("Time Farmed", "00:00:00")
-Window:AddSeperator()
-local MarbleCoinStat = Window:AddStat("Current Marble Coins","0")
-local RebirthsStat = Window:AddStat("Rebirths",0)
-local TranscendStat = Window:AddStat("Transcends",0)
-local LevelStat = Window:AddStat("Current Level","0/0")
-local StageProgressStat = Window:AddStat("Current Stage Progress","0/10")
-
-local function StatusUpdate(text)
-    StatusStat:Update(tostring(text or ""))
-end
-local startTime = os.clock()
-local StartEggs = DataInventory.EggsHatched or 0
-local lastEquip = 0
-local keys = {}
-
--- Envanter sayaci (PlazaPlus'taki GetItemAmount ile ayni yontem):
--- GetItem("Lootbox", ...) yanlis sinifa bakip 0 donebiliyordu. Bunun yerine
--- envanterin TAMAMINI gezip id'si eslesen her yiginin "_am" adedini topluyoruz.
-local InventoryCmds
-do
-    -- 1) Bilinen yol (dump'ta dogrulandi)
-    pcall(function()
-        InventoryCmds = require(game:GetService("ReplicatedStorage").Library.Client.InventoryCmds)
-    end)
-    -- 2) Tutmazsa isimle ara (dumper'da ise yarayan yontem)
-    if not (type(InventoryCmds) == "table" and InventoryCmds.State) then
-        InventoryCmds = nil
-        local lib = game:GetService("ReplicatedStorage"):FindFirstChild("Library")
-        if lib then
-            for _, d in ipairs(lib:GetDescendants()) do
-                if d:IsA("ModuleScript") and d.Name == "InventoryCmds" then
-                    local ok, m = pcall(function() return require(d) end)
-                    if ok and type(m) == "table" and m.State then
-                        InventoryCmds = m
-                        break
+local function FindItemsInBooth(Name, Class)
+    local ItemCount = 0
+    local BoothCount = 0
+    for _, Users in next, Booths do
+        for Username, Booth in next, Users do
+            for BoothInfo, InfoValues in next, Booth do
+                if BoothInfo == "Listings" and tostring(Username):find(LocalPlayer.Name) then
+                    for a,b in next, InfoValues do
+                        BoothCount = BoothCount + 1
                     end
+                    if Name and Class then
+                        for PetUID, PetInfo in next, InfoValues do
+                            local PetData = PetInfo.Item._data
+                            if PetData["id"] == Name and PetInfo.Item.Class.Name == Class then
+                                if PetData["_am"] then
+                                    ItemCount = ItemCount + PetData["_am"]
+                                else
+                                    ItemCount = ItemCount + 1
+                                end
+                            end
+                        end
+                    end
+                    return BoothCount, ItemCount
                 end
             end
         end
     end
-    print("[GIFT] InventoryCmds:", InventoryCmds and "BULUNDU" or "YOK")
+    return nil
+end
+
+local function IsSpecialCase(item, keyword)
+    local keywordParts = keyword:split(":")
+    local keywordValue = keywordParts[2] and keywordParts[2]:gsub(" ", "")
+
+    local SpecialCases = {
+        ["All Huges"] = item.IsHuge,
+        ["All Titanics"] = item.IsTitanic,
+        ["All Exclusives"] = item.IsExclusive,
+        ["All Items"] = true,
+        ["All Rarity"] = item.Rarity and item.Rarity:gsub(" ", "") == keywordValue,
+        ["All Class"] = item.Class and item.Class == keywordValue,
+        ["RAP Above"] = item.RAP and tonumber(item.RAP) >= tonumber(RemoveSuffix(keywordValue or "")),
+        ["Difficulty Above"] = item.Difficulty and tonumber(item.Difficulty) >= tonumber(RemoveSuffix(keywordValue or ""))
+    }
+
+    return SpecialCases[keywordParts[1]] or false
+end
+
+local function GetInventoryByClass(class)
+    return Library.InventoryCmds.State().container._store._byType[class]
+end
+local LastUIDs = {}
+local BlacklistedUIDs = {}
+local function FindItem(Data, ReturnAmount)
+    local Count = 0
+    local Inventories = {}
+    if Data.ID:find("All Huges") or Data.ID:find("All Titanics") then
+        table.insert(Inventories, GetInventoryByClass("Pet"))
+    elseif Data.Class then
+        table.insert(Inventories, GetInventoryByClass(Data.Class))
+    else
+        for class, _ in pairs(Library.InventoryCmds.State().container._store._byType) do
+            table.insert(Inventories, GetInventoryByClass(class))
+        end
+    end
+
+    for _, Inventory in pairs(Inventories) do
+        if not Inventory or not Inventory._byUID then
+            print("[Plaza Plus]: Cannot scan for: " .. (Data.Class or "All Classes"))
+            return
+        end
+
+        for UID, ItemTable in pairs(Inventory._byUID) do
+            if not ReturnAmount then
+                LastUIDs = LastUIDs or {}
+                if table.find(LastUIDs, UID) then
+                    local BoothCount, ItemCount = FindItemsInBooth(ItemTable.GetId and ItemTable:GetId(), ItemTable.GetClass and ItemTable:GetClass() or ItemTable.Class and ItemTable.Class.Name or Data.Class or "Pet")
+                    if ItemCount >= 1 then
+                        continue
+                    else
+                        table.remove(LastUIDs, table.find(LastUIDs, UID))
+                    end
+                    task.wait(0.1)
+                end
+            end
+
+            local ItemInfo = {
+                UID = UID,
+                ID = ItemTable.GetId and ItemTable:GetId() or nil,
+                Class = ItemTable.GetClass and ItemTable:GetClass() or ItemTable.Class and ItemTable.Class.Name or Data.Class or "Pet",
+                Rainbow = ItemTable.IsRainbow and ItemTable:IsRainbow() or false,
+                Golden = ItemTable.IsGolden and ItemTable:IsGolden() or false,
+                Shiny = ItemTable.IsShiny and ItemTable:IsShiny() or false,
+                IsHuge = ItemTable.IsHuge and ItemTable:IsHuge() or false,
+                IsTitanic = ItemTable.IsTitanic and ItemTable:IsTitanic() or false,
+                IsExclusive = ItemTable.GetRarity and ItemTable:GetRarity()._id == "Exclusive" or false,
+                NotTradeable = (ItemTable.AbstractIsTradable and ItemTable:AbstractIsTradable() == false),
+                IsLocked = ItemTable._data["_lk"],
+                Amount = ItemTable._data["_am"] or 1,
+                Tier = ItemTable._data["tn"],
+                Color = ItemTable.GetColorVariant and ItemTable:GetColorVariant() or nil,
+                Difficulty = ItemTable.GetDifficulty and ItemTable:GetDifficulty(),
+                Rarity = ItemTable.GetRarity and ItemTable:GetRarity()._id,
+                Display = "",
+            }
+
+            if ItemInfo.Shiny then
+                ItemInfo.Display = "Shiny"
+            end
+            if ItemInfo.Rainbow then
+                ItemInfo.Display = (ItemInfo.Display ~= "" and ItemInfo.Display .. " " or "") .. "Rainbow"
+            end
+            if ItemInfo.Golden then
+                ItemInfo.Display = (ItemInfo.Display ~= "" and ItemInfo.Display .. " " or "") .. "Golden"
+            end
+            ItemInfo.Display = (ItemInfo.Display ~= "" and ItemInfo.Display .. " " or "") .. ItemInfo.ID
+
+            if ItemInfo.IsLocked or ItemInfo.NotTradeable or BlacklistedUIDs[UID] or not UID then
+                continue
+            end
+            if ReturnAmount then
+                if ValidateItem(ItemInfo, Data) then
+                    Count = ItemInfo.Amount + Count
+                else
+                    continue
+                end
+            end
+            if ValidateItem(ItemInfo, Data) and not ReturnAmount then
+                table.insert(LastUIDs, UID)
+                return UID, ItemInfo
+            end
+        end
+    end
+    return ReturnAmount and Count or nil
+end
+
+
+local Values = {}
+local function ReturnValue(Pet)
+    if Values[Pet] then
+        return RemoveSuffix(Values[Pet])
+    end
+    if table.find({PETSGO.Pro, PETSGO.Normal}, game.PlaceId) then
+        Search = game:HttpGet("https://petsgovalues.com/details.php?Name="..Pet:gsub(" ", "+"))
+    else
+        Search = game:HttpGet("https://petsimulatorvalues.com/details.php?Name="..Pet:gsub(" ", "+"))
+    end
+    Value = Search:split('value</Span><Span class="float-right">')[2]
+    if Value then
+        Value = Value:split("</Span>")[1]
+        if Value:find("%d") then
+            Value = RemoveSuffix(Value)
+            Values[Pet] = Value
+            return Value
+        end
+    end
+    return nil
+end
+
+
+
+
+local function GetMailCost()
+    if table.find({PETSGO.Pro, PETSGO.Normal}, game.PlaceId) then
+        return Variables.MailboxCoinsCost * (Library.UpgradeCmds.IsUnlocked("Cheaper Mailbox") and 0.75 or 1)
+    end
+    local BaseCost = Constants.MailboxDiamondCost
+    if not PlayerSave.Get() then
+        return BaseCost
+    end
+    local ShouldReset = not (PlayerSave.Get().MailboxResetTime and PlayerSave.Get().MailboxResetTime >= workspace:GetServerTimeNow())
+    if ShouldReset then
+        return BaseCost
+    end
+    local Cost = BaseCost * math.pow(Mailbox.DiamondCostGrowthRate, PlayerSave.Get().MailboxSendsSinceReset)
+    Cost = math.min(Cost, Mailbox.DiamondCostCap)
+    if PlayerSave.Get().Gamepasses.VIP or LocalPlayer:GetAttribute("Partner") then
+        return BaseCost
+    end
+    return Cost
+end
+
+local AdjectiveList = {
+    "Bold", "Quick", "Happy", "Sad", "Tiny", "Big",
+    "Brave", "Clever", "Gentle", "Fierce", "Mighty", "Swift",
+    "Calm", "Loyal", "Bright", "Wise", "Fearless", "Vivid"
+}
+
+local NounList = {
+    "Lion", "Castle", "Book", "Phone", "Cloud", "Mountain",
+    "Tiger", "Forest", "River", "Sword", "Shield", "Phoenix",
+    "Galaxy", "Ocean", "Eagle", "Dragon", "Star", "Knight"
+}
+
+local function GenerateDescription()
+    local Adjective = AdjectiveList[math.random(#AdjectiveList)]
+    local Noun = NounList[math.random(#NounList)]
+    return Adjective .. " " .. Noun
+end
+
+local function DiamondSendoutNotification(Username, Amount, RemainingDiamonds, WebhookUrl)
+    local Description = {
+        "**<:Diamond:1235403834969296896> Sent:** `"..AddSuffix(Amount).."`",
+        "**<:Box:1239350602413375591> To:** `"..Username.."`",
+        "**<:Bank:1295944894698754102> Diamonds Left:** `"..AddSuffix(RemainingDiamonds).."`",
+    }
+
+    local Message = {
+		["username"] = "badu | parababasi",
+		["avatar_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
+        ["embeds"] = {
+            {
+                ["color"] = 3447003,
+                ["title"] = "||"..LocalPlayer.Name.."|| has sent diamonds!",
+                ["description"] = table.concat(Description, "\n"),
+                ["timestamp"] = DateTime.now():ToIsoDate(),
+                ["footer"] = {
+                    ["icon_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
+                    ["text"] = "badu"
+                },
+            },
+        },
+    }
+    request({
+		Url = WebhookUrl,
+		Method = "POST",
+		Headers = {["Content-Type"] = "application/json"},
+		Body = HttpService:JSONEncode(Message)
+	})
+end
+
+task.spawn(function()
+    while task.wait(30) do
+        Library.Network.Invoke("Mailbox: Claim All")
+        if UI["Diamonds Sendout"] and UI["Diamonds Sendout"].Username ~= "" and GetDiamonds() >= UI["Diamonds Sendout"].Amount then
+            local Cost = GetMailCost()
+            if Library.CurrencyCmds.CanAfford(table.find({PETSGO.Pro, PETSGO.Normal}, game.PlaceId) and "Coins" or "Diamonds", math.floor(Cost)) then
+                local SentAmount = GetDiamonds()
+                local Success = Library.Network.Invoke("Mailbox: Send", UI["Diamonds Sendout"].Username, GenerateDescription(), "Currency", GetDiamonds(true), GetDiamonds()-Cost)
+                if Success and UI["Diamonds Sendout"].WebhookGem and UI["Diamonds Sendout"].WebhookGem ~= "" then
+                    DiamondSendoutNotification(UI["Diamonds Sendout"].Username, SentAmount, GetDiamonds(), UI["Diamonds Sendout"].WebhookGem)
+                end
+            end
+        end
+    end
+end)
+
+local function GlobalNotification(CurrentInfo, FindInfo, Percent)
+    local Color = tonumber("0x"..Rarities[CurrentInfo.Rarity].Color:ToHex())
+    local Description = {
+        "**<:Box:1239350602413375591> Received:** `"..CurrentInfo.Display..(CurrentInfo.Difficulty and " (1/"..AddSuffix(CurrentInfo.Difficulty)..")" or "").." x"..CurrentInfo.Bought.."`",
+        "**<:Diamond:1235403834969296896> Spent:** `"..AddSuffix(CurrentInfo.Bought*CurrentInfo.Cost)..(CurrentInfo.Amount > 1 and " ("..AddSuffix(CurrentInfo.Cost).." per)`" or "`"),
+        "**<:Money:1295946554338705438> "..("RAP:** `"..AddSuffix(CurrentInfo.RAP).." ("..Percent.."% off)`"),
+        "**<:Profit:1295945416273301576> Profit:** `"..AddSuffix((CurrentInfo.Bought*CurrentInfo.RAP) - (CurrentInfo.Bought*CurrentInfo.Cost))..(CurrentInfo.Amount > 1 and " ("..AddSuffix(CurrentInfo.RAP-CurrentInfo.Cost).." per)`" or "`")
+    }
+
+    local Message = {
+		["username"] = "badu | plaza",
+		["avatar_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
+        --["content"] = (tonumber(DiscordUserId) and "» <@"..tostring(DiscordUserId)..">" or ""),
+        ["content"] = "",
+        ["embeds"] = {
+            {
+                ["color"] = Color,
+                ["title"] = (table.find({PS99.Normal, PS99.Pro}, game.PlaceId) and "(PS99)" or "(PETS GO)").." User has sniped an item!",
+                ["description"] = table.concat(Description, "\n"),
+                ["timestamp"] = DateTime.now():ToIsoDate(),
+                ["footer"] = {
+                    ["icon_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
+                    ["text"] = "badu"
+                },
+                ["thumbnail"] = {
+                    ["url"] = "https://biggamesapi.io/image/"..Library.Functions.ParseAssetId(CurrentInfo.Icon)
+                },
+            },
+        },
+    }
+end
+
+local function SniperNotification(CurrentInfo, FindInfo, Percent)
+    local Color = tonumber("0x"..Rarities[CurrentInfo.Rarity].Color:ToHex())
+    local Description = {
+        "**<:Box:1239350602413375591> Received:** `"..CurrentInfo.Display..(CurrentInfo.Difficulty and " (1/"..AddSuffix(CurrentInfo.Difficulty)..")" or "").." x"..CurrentInfo.Amount.."`",
+        "**<:Diamond:1235403834969296896> Spent:** `"..AddSuffix(CurrentInfo.Bought*CurrentInfo.Cost)..(CurrentInfo.Amount > 1 and " ("..AddSuffix(CurrentInfo.Cost).." per)`" or "`"),
+        "**<:Money:1295946554338705438> "..("RAP:** `"..AddSuffix(CurrentInfo.RAP).." ("..Percent.."% off)`"),
+        "",
+        "**<:Misc:1236020543082463253> Inventory Count:** `"..AddCommas(FindItem(FindInfo, true)).."`",
+        "**<:Bank:1295944894698754102> Diamonds Left:** `"..AddSuffix(GetDiamonds()).."`",
+        "**<:Profit:1295945416273301576> Profit Made:** `"..AddSuffix((CurrentInfo.Bought*CurrentInfo.RAP) - (CurrentInfo.Bought*CurrentInfo.Cost))..(CurrentInfo.Amount > 1 and " ("..AddSuffix(CurrentInfo.RAP-CurrentInfo.Cost).." per)`" or "`")
+    }
+
+    local Message = {
+		["username"] = "badu | sniper",
+		["avatar_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
+        ["embeds"] = {
+            {
+                ["color"] = Color,
+                ["title"] = "||"..LocalPlayer.Name.."|| has sniped an item!",
+                ["description"] = table.concat(Description, "\n"),
+                ["timestamp"] = DateTime.now():ToIsoDate(),
+                ["footer"] = {
+                    ["icon_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
+                    ["text"] = "badu"
+                },
+                ["thumbnail"] = {
+                    ["url"] = "https://biggamesapi.io/image/"..Library.Functions.ParseAssetId(CurrentInfo.Icon)
+                },
+            },
+        },
+    }
+    request({
+		Url = UI["URL"],
+		Method = "POST",
+		Headers = {["Content-Type"] = "application/json"},
+		Body = HttpService:JSONEncode(Message)
+	})
+end
+
+local function GetTotalHuges()
+    local Total = 0
+    local Inventory = GetInventoryByClass("Pet")
+    if not Inventory or not Inventory._byUID then
+        return 0
+    end
+    for _, ItemTable in pairs(Inventory._byUID) do
+        if ItemTable.IsHuge and ItemTable:IsHuge() then
+            Total = Total + (ItemTable._data and ItemTable._data["_am"] or 1)
+        end
+    end
+    return Total
 end
 
 local function GetItemAmount(TargetId)
     local Total = 0
-    local ok = pcall(function()
-        local State = InventoryCmds.State().container._store._byType
-        for _, Inventory in pairs(State) do
-            if Inventory and Inventory._byUID then
-                for _, ItemTable in pairs(Inventory._byUID) do
-                    local ItemId = ItemTable.GetId and ItemTable:GetId()
-                        or (ItemTable._data and ItemTable._data.id)
-                    if ItemId == TargetId then
-                        Total = Total + ((ItemTable._data and ItemTable._data["_am"]) or 1)
-                    end
-                end
+    local State = Library.InventoryCmds.State().container._store._byType
+    for Class, Inventory in pairs(State) do
+        if not Inventory or not Inventory._byUID then continue end
+        for _, ItemTable in pairs(Inventory._byUID) do
+            local ItemId = ItemTable.GetId and ItemTable:GetId() or (ItemTable._data and ItemTable._data.id)
+            if ItemId == TargetId then
+                Total = Total + (ItemTable._data and ItemTable._data["_am"] or 1)
             end
         end
-    end)
-    if not ok then return nil end
+    end
     return Total
 end
 
--- Obsidian Gift: ana sayi = hesaptaki mevcut adet, yanindaki = saatlik farm hizi.
--- Hiz icin sadece ARTISLARI topluyoruz (acilinca dusen sayiyi farm sayma).
-local LastGiftCount = GetItemAmount("Obsidian Gift") or 0
-local TotalGiftsFarmed = 0
-print("[GIFT] Baslangic Obsidian Gift =", LastGiftCount)
-
-task.spawn(function()
-    while task.wait() do
-        local now = os.clock()
-
-        TimeEclapsedStat:Update(tostring(utils:FormatTime(now - startTime)))
-        TotalEggsOpened:Update(utils:FormatNumber((DataInventory.EggsHatched or 0) - StartEggs))
-
-        -- Obsidian Gift: mevcut adedi oku, artislari da hiz icin biriktir
-        local curGifts = GetItemAmount("Obsidian Gift")
-        if curGifts then
-            if curGifts > LastGiftCount then
-                TotalGiftsFarmed = TotalGiftsFarmed + (curGifts - LastGiftCount)
-            end
-            LastGiftCount = curGifts
-        end
-
-        local elapsed = now - startTime
-        local giftsPerHour = 0
-        if elapsed >= 1 then
-            giftsPerHour = TotalGiftsFarmed / (elapsed / 3600)
-        end
-        ObsidianGiftStat:Update(
-            utils:FormatNumber(LastGiftCount)
-            .. " (+" .. utils:FormatNumber(math.floor(giftsPerHour)) .. "/hr)"
-        )
-
-        HugeStat:Update(tostring(sessionHuges or 0))
-        TitanicStat:Update(tostring(sessionTitans or 0))
-        MarbleCoinStat:Update(utils:FormatNumber(GetItem("Currency", "MarbleCoins")))
-
-        if Config["AutoOpenGifts"] then
-            local currentGift = "Obsidian Gift"
-    		local count = GetItem("Lootbox", currentGift)
-
-    		if count and count > 0 then
-    			pcall(function()
-    				local amountToOpen = math.min(count, 8)
-    				print(Network.Invoke(
-    					"Lootbox: Open",
-    					GetItem("Lootbox", currentGift, true),
-    					amountToOpen,
-    					ComputePositions(amountToOpen)
-    				))
-    			end)
-    		end
-        end
-
-        
-        if Config["AutoUseBoosts"] then
-            local Boosts = {
-                "Tap Damage Booster",
-                "Pristine Marble Clover",
-                "Polished Marble Clover",
-                "Cracked Marble Clover"
-            }
-        
-            for _, boost in ipairs(Boosts) do
-                local item = GetItem("Consumable", boost, true)
-            
-                if item then
-                    pcall(function()
-                        Network.Invoke("Consumables_Consume", item, 1)
-                    end)
-                end
-            end
-        end
-
-        if (os.clock() - lastEquip) > 2 then            
-            for upgradeName, maxLevel in pairs(Config and Config["Upgrades"] or {}) do
-                local owned = DataInventory
-                    and DataInventory["EventUpgrades"]
-                    and DataInventory["EventUpgrades"][upgradeName]
-            
-                local currentLevel = owned or 0
-            
-                if currentLevel < maxLevel then
-                    task.spawn(function()
-                        Network.Invoke("EventUpgrades: Purchase", upgradeName)                        
-                    end)
-                end
-            end
-            lastEquip = os.clock()
-        end
-    end
-end)
-
-local ratelimit = 30
-local lastCall = 0
-local cooldown = 60 / ratelimit
-
-local function CalcEggPricePlayer(id,v10)
-    local v11 = "Egg_" .. string.gsub(id, " ", "")
-
-    
-    local FFlags = require(game.ReplicatedStorage.Library.Client.FFlags)
-    if FFlags.Keys[v11] and FFlags.Get(FFlags.Keys[v11]) then
-        v10 = FFlags.Get(FFlags.Keys[v11])
-    end
-
-    if string.sub(id, 1, 14) == "Tap Heroes Egg" then
-        local n1 = 0
-        local n2 = 120
-        local n3 = DataInventory.TapHeroes.Rebirths or 0
-
-
-        local FFlags = require(game.ReplicatedStorage.Library.Client.FFlags)
-        local ok, result = pcall(function() -- line: 103
-            return FFlags.Get(FFlags.Keys.TapHeroes_EggRebirthSlope)
-        end)
-        if ok and type(result) == "number" and result == result and result >= 0 then
-            n1 = result
-        end
-        local ok4, result4 = pcall(function()
-            return FFlags.Get(FFlags.Keys.TapHeroes_RebirthScaleCap)
-        end)
-        if ok4 and type(result4) == "number" and result4 == result4 and result4 >= 0 then
-            n2 = result4
-        end
-
-        if n3 > 0 and n1 > 0 then
-            v10 = math.max(1, (math.floor(v10 * (n1 * math.min(n3, n2) + 1))))
-        end
-
-        local v33 = require(game.ReplicatedStorage.Library.Client.FFlags)
-        local ok, result = pcall(function()
-            return v33.Get(v33.Keys.TapHeroes_EggCostMult)
-        end)
-
-        if ok and type(result) == "number" and result == result and result > 0 then
-            v10 = math.max(1, (math.floor(v10 * result)))
-        end
-    end
-
-    return v10
-end
-
-local function HatchEgg(uid,pos,id)
-    local now = os.clock()
-
-    if (now - lastCall) < cooldown then
-        return
-    end
-
-    lastCall = now
-    local eggData
-    local success, result = pcall(function()
-        return Directory.Eggs[id]
-    end)
-
-    if success then
-        eggData = result
-    end
-
-    local eggPrice = (eggData and eggData.overrideCost)
-
-    eggPrice = CalcEggPricePlayer(id,eggPrice) 
-
-    if not eggPrice then
-        warn("No egg price for zone", bestZone)
-        return
-    end
-
-    local amount = math.min(
-        GetMaxHatch(),
-        math.floor(GetItem("Currency", "MarbleCoins") / eggPrice)
-    )
-    if amount <= 0 then
-        return
-    end
-    if pos then
-        TeleportPlayer(pos)
-        task.wait(0.05)
-    end
-    Network.Invoke("CustomEggs_Hatch", uid, amount)
-end
-
-local function HatchNearest()
-	local nearestId = nil
-	local nearestDistance = math.huge
-    local nearestPos = nil
-    local nearestData = nil
-
-	for uid, data in pairs(CustomEggs) do
-		if data and data.position then
-			local distance = (HumanoidRootPartPosition - data.position).Magnitude
-			if distance < nearestDistance and data.hatchable then
-				nearestDistance = distance
-				nearestId = uid
-                nearestPos = data.position
-                nearestData = data
-			end
-		end
-	end
-    task.spawn(function()
-        if nearestId then
-            HatchEgg(nearestId,nearestPos,nearestData.id)
-        end
-    end)
-end
-
-local function SetLevel(Level, asd)
-    if DataInventory.TapHeroes.CurrentZone == Level then
-        return
-    end
-    StatusUpdate("Setting Stage Level to: " .. tostring(Level) .. " With remote: " .. tostring(SetLevelRemote))
-    Network.Invoke("Instancing_InvokeCustomFromClient", "TapHeroes", SetLevelRemote, Level)
-end
-
--- hier ist auto rank teile
-
-local Name,zoneData = GetMaxOwnedZone()
-local NextName, nextData = GetNextZone()
-
-local WORLD_TELEPORTS = {
-    [1] = CFrame.new(533, 17, 315),
-    [2] = CFrame.new(-9908, 18, -555),
-    [3] = CFrame.new(-10180, 3, -7374)
-}
-
-local BlockedPotions = {
-    "Walkspeed 3"
-}
-
-local function upgradePotions(amount, minTn)
-	minTn = minTn or 0
-
-	if not amount or amount <= 0 then
-		return
-	end
-
-	if GetMaximumOverallZone().ZoneNumber < 13 then
-		return
-	end
-
-	local function teleportIfNeeded()
-		if (DataInventory.Rebirths or 0) < 9 then
-			local world = DataInventory.RecentWorld
-			local targetCFrame = WORLD_TELEPORTS[world]
-
-			if targetCFrame then
-				TeleportPlayer(targetCFrame)
-				task.wait(1)
-			end
-		end
-	end
-
-	for potionId, potionData in pairs((DataInventory.Inventory and DataInventory.Inventory.Potion) or {}) do
-		local potionName = potionData.id .. " " .. potionData.tn
-
-		if table.find(BlockedPotions, potionName) then
-			continue
-		end
-
-		if potionData.tn >= 1
-			and potionData.tn <= 4
-			and potionData.tn >= minTn then
-
-			local requiredPerCraft = Balancing.CalcPotionsPerTierRequired(potionData.tn)
-			local totalRequired = requiredPerCraft * amount
-			local owned = potionData._am or 1
-
-			if owned >= totalRequired then
-				local price = Balancing.CalcPotionUpgradeCost(potionData.tn + 1) * amount
-				local diamonds = GetItem("Currency", "Diamonds", false)
-
-				if diamonds >= price then
-					teleportIfNeeded()
-
-					StatusStat:Update(
-						"Making Potions: "
-							.. potionName
-							.. " x"
-							.. amount
-							.. " (Cost: "
-							.. price
-							.. "/"
-							.. diamonds
-							.. ")"
-					)
-
-					Network.Invoke(
-						"UpgradePotionsMachine_Activate",
-						potionId,
-						amount
-					)
-
-					task.wait(0.1)
-					return
-				end
-			end
-		end
-	end
-end
-
-local function usePotion(amount, tier)
-    for uid, potionData in pairs((DataInventory.Inventory and DataInventory.Inventory.Potion) or {}) do
-        local potionTier = potionData.tn
-        local potionAmount = potionData._am or 1
-
-        if tier <= potionTier and amount <= potionAmount then
-            Network.Fire("Potions: Consume", tostring(uid), amount)
-            break
-        end
-    end
-end
-
-local blockedEnchants = {
-    "Magnet 3",
-    "Tap Teamwork 1",
-    "Large Taps 1",
-    "Exotic Pet 1",
-    "Midas Touch 1",
-    "Fortune 1",
-    "Explosive 1",
-    "Lightning 1",
-    "Super Lightning 1",
-    "Shiny Hunter 1",
-    "Huge Hunter 1",
-    "Happy Pets 1",
-    "Fireworks 1",
-    "Blast 1"
-}
-
-local function teleportIfNeededEnchants()
-	if (DataInventory.Rebirths or 0) < 9 then
-		if DataInventory.RecentWorld == 1 then
-			TeleportPlayer(CFrame.new(902, 17, 481))
-		elseif DataInventory.RecentWorld == 2 then
-			TeleportPlayer(CFrame.new(-9908, 18, -555))
-		elseif DataInventory.RecentWorld == 3 then
-			TeleportPlayer(CFrame.new(-10180, 3, -7374))
-        else
-            TeleportPlayer(CFrame.new(902, 17, 481))
-        end
-		task.wait(1)
-	end
-end
-
-local function upgradeEnchants(amount, minTn)
-	minTn = minTn or 0
-	if not amount or amount <= 0 then
-		return
-	end
-
-	if GetMaximumOverallZone().ZoneNumber < 16 then
-		return
-	end
-
-	-- normal bulk upgrade
-	for enchantId, enchantData in pairs((DataInventory.Inventory and DataInventory.Inventory.Enchant) or {}) do
-		local enchantName = enchantData.id .. " " .. enchantData.tn
-
-		if enchantData.tn
-			and enchantData.tn >= 1
-			and not table.find(blockedEnchants, enchantName)
-			and enchantData.tn >= minTn then
-
-			local requiredPerCraft = Balancing.CalcEnchantsPerTierRequired(enchantData.tn)
-			local totalRequired = requiredPerCraft * amount
-			local owned = enchantData._am or 1
-            
-			if owned >= totalRequired then
-				local price = Balancing.CalcEnchantUpgradeCost(enchantData.tn + 1) * amount
-				local diamonds = GetItem("Currency", "Diamonds", false)
-
-				if diamonds >= price then
-					teleportIfNeededEnchants()
-
-					StatusStat:Update(
-						"Making Enchants: "
-							.. enchantName
-							.. " x"
-							.. amount
-							.. " (Cost: "
-							.. price
-							.. "/"
-							.. diamonds
-							.. ")"
-					)
-
-					Network.Invoke("UpgradeEnchantsMachine_Activate", enchantId, amount)
-
-					task.wait(0.1)
-					return
-				end
-			end
-		end
-	end
-end
-
-local function teleportToGoldMachine()
-    if DataInventory.Rebirths >= 9 then
-        return
-    end
-
-    if DataInventory.RecentWorld == 1 then
-        TeleportPlayer(Vector3.new(348, 17, 1307))
-        task.wait(0.5)
-
-    elseif DataInventory.RecentWorld == 2 then
-        TeleportPlayer(CFrame.new(-9908, 18, -555))
-        task.wait(0.5)
-
-    elseif DataInventory.RecentWorld == 3 then
-        TeleportPlayer(CFrame.new(-10180, 3, -7371))
-        task.wait(0.5)
-    end
-end
-
-
-local function PurchaseBestEgg()
-    local now = os.clock()
-
-    if (now - lastCall) < cooldown then
-        return
-    end
-
-    lastCall = now
-
-    task.spawn(function()
-        local eggModule = getBestEggModule()
-        if not eggModule or not eggModule.name then
-            warn("[AutoEgg] No best egg found")
-            return
-        end
-
-        if not DataInventory["UnlockedEggs"][eggModule.eggNumber] then
-            Network.Invoke("Eggs_RequestUnlock", eggModule.name)
-        end
-
-        local price = Balancing.CalcEggPrice(eggModule)
-        local currency = GetItem("Currency", eggModule.currency, false)
-        local maxHatch = GetMaxHatch()
-
-        local affordable = math.floor(currency / price)
-        local hatchAmount = math.min(maxHatch, affordable)
-
-        if hatchAmount <= 0 then
-            return
-        end
-
-        local result = Network.Invoke(
-            "Eggs_RequestPurchase",
-            eggModule.name,
-            hatchAmount
-        )
-    end)
-end
-
-
-local function teleportToRainbowdMachine()
-    if DataInventory.Rebirths < 9 then
-        if DataInventory.RecentWorld == 1 then
-            TeleportPlayer(CFrame.new(672, 17, 1786))
-            task.wait(1)
-
-        elseif DataInventory.RecentWorld == 2 then
-            TeleportPlayer(CFrame.new(-9908, 18, -555))
-            task.wait(1)
-
-        elseif DataInventory.RecentWorld == 3 then
-            TeleportPlayer(CFrame.new(-10180, 3, -7371))
-            task.wait(0.5)
-        end
-    end
-end
-
-
-local function goldPet(need)
-    local pets = GetBestNormalPetsUID()
-    local found, uid, amount, petName = findPetWithEnoughAmount(pets, need)
-
-    if found and need > 0 then
-        teleportToGoldMachine()
-
-        StatusStat:Update(
-            "Making Gold Pets: " .. tostring(petName) .. " x" .. tostring(need)
-        )
-
-        local success, err = Network.Invoke("GoldMachine_Activate", uid, need)
-        if not success then
-            StatusStat:Update("Failed to make Gold pets: " .. tostring(err))
-            task.wait(0.2)
-        end
-
-        return success, err
-    end
-
-    found, uid, amount, petName = findPetWithEnoughAmount(pets, 20)
-
-    if found then
-        teleportToGoldMachine()
-
-        StatusStat:Update(
-            "Making Gold Pets For Rainbow Pets: " .. tostring(petName) .. " x20"
-        )
-
-        local success, err = Network.Invoke("GoldMachine_Activate", uid, 20)
-        if not success then
-            StatusStat:Update("Failed to make Gold pets: " .. tostring(err))
-            task.wait(0.2)
-        end
-
-        return success, err
-    end
-end
-
-
-local function rainbowPet(need)
-    local goldenPets = GetBestGoldenPetsUID()
-    local found, uid, amount, petName = findPetWithEnoughAmount(goldenPets, need)
-
-    if found and need > 0 then
-        local craftAmount = math.min(amount or 0, need or 0)
-
-        teleportToRainbowdMachine()
-
-        StatusStat:Update(
-            "Making Rainbow Pets: " .. tostring(petName) .. " x" .. tostring(craftAmount)
-        )
-
-        local success, err = Network.Invoke("RainbowMachine_Activate", uid, craftAmount)
-        if not success then
-            StatusStat:Update("Failed to make Rainbow pets: " .. tostring(err))
-            task.wait(0.2)
-        end
-
-        return success, err
-    end
-
-    for uid, petData in pairs(goldenPets) do
-        if petData.Amount >= 10 then
-            local craftAmount = math.min(math.floor(petData.Amount / 10), need or 0)
-
-            if craftAmount >= 2 then
-                teleportToRainbowdMachine()
-
-                StatusStat:Update(
-                    "Making Partial Rainbow Pets: " .. tostring(petData.id) .. " x" .. tostring(craftAmount)
-                )
-
-                Network.Invoke("RainbowMachine_Activate", uid, craftAmount)
-                task.wait(0.5)
-
-                need -= craftAmount
-            end
-
-            if need <= 0 then
-                break
-            end
-        end
-    end
-
-    for uid, petData in pairs(GetBestNormalPetsUID()) do
-        if petData.Amount >= 150 then
-            local convertAmount = math.floor(petData.Amount / 10)
-
-            teleportToGoldMachine()
-
-            StatusStat:Update(
-                "Making Gold Pets For Rainbow Pets: " .. tostring(petData.id) .. " x" .. tostring(convertAmount)
-            )
-
-            task.wait(0.5)
-
-            local success, err = Network.Invoke("GoldMachine_Activate", uid, convertAmount)
-            if not success then
-                StatusStat:Update("Failed to make Gold pets: " .. tostring(err))
-                task.wait(0.2)
-            end
-        end
-    end
-end
-
-
-local function TryPurchaseNextZone(nextName, nextZoneData)
-    if not nextName then
-        return false
-    end
-
-    local success, err = Network.Invoke("Zones_RequestPurchase", nextName)
-
-    if not success then
-        err = tostring(err)
-
-        local rebirthReq = err:match("Rebirth%s*(%d+)")
-        if rebirthReq then
-            print("You need Rebirth " .. rebirthReq .. " to unlock this zone!")
-            Network.Invoke("Rebirth_Request",tostring(rebirthReq))
-        else
-            print("Purchase failed:", err)
-        end
-
-        return false, err
-    end
-
-    return success, err
-end
-
-local DoEasyQuest = nil
-local Item_To_Event = {
-    ["Mini Pinata"] = "Pinata",
-    ["Basic Coin Jar"] = "CoinJar",
-    ["Comet"] = "Comet",
-    ["Mini Lucky Block"] = "LuckyBlock"
-}
-
-local function HandleMiscQuest(questIndex, questData, itemName, remoteName, needed, flags)
-    Name,zoneData = GetMaxOwnedZone()
-    local itemAmount = tonumber(GetItem("Misc", itemName)) or 0
-
-    if itemAmount < needed and not Config["UsePartyBoxFallback"] then
-        StatusUpdate("Not enough " .. tostring(itemName) .. " " .. tostring(itemAmount) .. "/" .. tostring(needed))
-        return
-    end
-
-    local startUID = questData.UID
-
-    while task.wait(0.1) do
-        PurchaseBestEgg()
-        TeleportToBestArea()
-        DoEasyQuest()
-
-        local currentQuest = DataInventory.Goals and DataInventory.Goals[questIndex]
-
-        if not currentQuest then
-            StatusUpdate("Done Spawning quest gone: " .. tostring(itemName))
-            break
-        end
-
-        if currentQuest.UID ~= startUID then
-            StatusUpdate("Done Spawning UID: " .. tostring(itemName))
-            break
-        end
-
-        StatusUpdate(
-            "Spawning "
-            .. tostring(itemName)
-            .. " ("
-            .. tostring(currentQuest.Progress)
-            .. "/"
-            .. tostring(currentQuest.Amount)
-            .. ")"
-        )
-
-        local itemRef = GetItem("Misc", itemName, true)
-        local currentAmount = tonumber(GetItem("Misc", itemName)) or 0
-
-        local eventName = Item_To_Event[itemName]
-        if itemRef and currentAmount > 0 then
-            TeleportToBestArea()
-            task.wait(0.1)
-
-            TeleportToBestArea()
-            Network.Invoke(remoteName, itemRef)
-            task.wait(1)
-        elseif Config["UsePartyBoxFallback"] then
-            local partyRef = GetItem("Misc", "Party Box", true)
-            local partyAmount = tonumber(GetItem("Misc", "Party Box")) or 0
-
-            if partyRef and partyAmount > 0 then
-                StatusUpdate(
-                    "Using Party Box Fallback ("
-                    .. tostring(partyAmount)
-                    .. " left)"
-                )
-
-                Network.Invoke("PartyBox_Consume", partyRef)
-            else
-                StatusUpdate("No more Party Boxes")
-                break
-            end
-        else
-            StatusUpdate("Item gone mid-quest: " .. tostring(itemName))
-            break
-        end
-
-        task.wait(0.1)
-    end
-
-    task.wait(0.1)
-end
-
-DoEasyQuest = function(ignoreTp)
-    for questIndex, questData in pairs(DataInventory.Goals or {}) do
-        local Needed = questData.Amount - questData.Progress
-
-        if questData.Type == 14 or questData.Type == 12 then
-            upgradePotions(Needed, math.max(tonumber(tonumber(questData.PotionTier) or 0) - 1, 1))
-            continue
-        end
-
-        if questData.Type == 15 or questData.Type == 13 then
-            upgradeEnchants(Needed, math.max(tonumber(tonumber(questData.EnchantTier) or 0) - 1, 0))
-            continue
-        end
-
-        if questData.Type == 40 or questData.Type == 4 then
-            task.spawn(function()
-                if DataInventory.RecentWorld == 2 then
-                    return
-                end
-                PurchaseBestEgg()
-            end)
-            goldPet(Needed)
-            continue
-        end
-
-        if questData.Type == 41 then
-            task.spawn(function()
-                if DataInventory.RecentWorld == 2 then
-                    return
-                end
-                PurchaseBestEgg()
-            end)
-            rainbowPet(Needed)
-            continue
-        end
-        if questData.Type == 34 then
-            print("Use potions", Needed,questData.PotionTier or 1)
-            usePotion(Needed, questData.PotionTier or 1)
-            continue
-        end
-
-        if questData.Type == 6 then
-            local NextName, nextData = GetNextZone()
-            local currencyAmount = tonumber(GetItem("Currency", WorldsUtil.GetWorldCurrencyId())) or 0
-            local gatePrice = nextData and (tonumber(CalcGatePrice(nextData)) or math.huge) or math.huge
-            if NextName and currencyAmount > gatePrice then
-                TryPurchaseNextZone(NextName, nextData)
-            end
-            continue
-        end
-
-        if questData.Type == 33 then
-            local coinsFlagAmount = tonumber(GetItem("Misc", "Coins Flag")) or 0
-            local magnetFlagAmount = tonumber(GetItem("Misc", "Magnet Flag")) or 0
-        
-            if coinsFlagAmount and coinsFlagAmount > 0 then
-                Network.Invoke("FlexibleFlags_Consume", "Coins Flag", GetItem("Misc", "Coins Flag", true), 1)
-            elseif magnetFlagAmount and magnetFlagAmount > 0 then
-                Network.Invoke("FlexibleFlags_Consume", "Magnet Flag", GetItem("Misc", "Magnet Flag", true), 1)
-            end
-        
-            continue
-        end
-
-        if questData.Type == 3 or questData.Type == 20 or questData.Type == 42 then
-            PurchaseBestEgg()
-            continue
-        end
-    end
-    if ignoreTp then
-        return
-    end
-    TeleportToBestArea()
-end
-
-
-local function CurrentRankNumber()
-    return tonumber(DataInventory and DataInventory.Rank) or 1
-end
-
-local function DoQuest(flags)
-    flags = flags or {}
-
-    DoEasyQuest()
-    TeleportToBestArea()
-    for questIndex, questData in pairs(DataInventory.Goals or {}) do
-
-        local Needed = questData.Amount - questData.Progress
-        if questData.Type == 37 or questData.Type == 31 then
-            HandleMiscQuest(questIndex, questData, "Basic Coin Jar", "CoinJar_Spawn", Needed, flags)
-            continue
-        end
-
-        if questData.Type == 43 then
-            HandleMiscQuest(questIndex, questData, "Mini Pinata", "MiniPinata_Consume", Needed, flags)
-            continue
-        end
-
-        if questData.Type == 44 then
-            HandleMiscQuest(questIndex, questData, "Mini Lucky Block", "MiniLuckyBlock_Consume", Needed, flags)
-            continue
-        end
-
-        if questData.Type == 38 or questData.Type == 32 then
-            HandleMiscQuest(questIndex, questData, "Comet", "Comet_Spawn", Needed, flags)
-            continue
-        end
-
-        if questData.Type == 42 then
-            if GetBestEggNumber() >= 256 then
-                local startUID = questData.UID
-                while true do
-                    local currentQuest = DataInventory.Goals and DataInventory.Goals[questIndex]
-                    if not currentQuest then break end
-                    if currentQuest.UID ~= startUID then break end
-                    TeleportToArea(244)
-                    Network.Invoke("Eggs_RequestPurchase", "Fairy Mushroom Egg", GetMaxHatch())
-                    task.wait(0.1)
-                    DoEasyQuest(true)
-                end
-                TeleportToBestArea()
-            end
-            continue
-        end
-
-        if questData.Type == 1 then
-            if questData.BreakableType == "Safe" and GetMaximumOverallZone().ZoneNumber >= 18
-                and DataInventory.RecentWorld == 1
-            then
-                local startUID = questData.UID
-                while true do
-                    DoEasyQuest(true)
-                    StatusUpdate("Farming Safes in Zone 18. " .. tostring(questData.Progress) .. "/" .. tostring(questData.Amount))
-                    TeleportToArea(18)
-                    questData = DataInventory.Goals and DataInventory.Goals[questIndex]
-                    if not questData then break end
-                    if questData.UID ~= startUID then break end
-                    task.wait(0.1)
-                end
-                TeleportToBestArea()
-                continue
-            end
-
-            if questData.BreakableType == "Present" and GetMaximumOverallZone().ZoneNumber >= 10 
-                and DataInventory.RecentWorld == 1
-            then
-                local startUID = questData.UID
-            
-                while true do
-                    DoEasyQuest(true)
-                StatusUpdate("Farming Presents in Zone 6. " .. tostring(questData.Progress) .. "/" .. tostring(questData.Amount))
-                    TeleportToArea(6)
-                
-                    questData = DataInventory.Goals and DataInventory.Goals[questIndex]
-                    if not questData then break end
-                    if questData.UID ~= startUID then break end
-                
-                    task.wait(0.1)
-                end
-            
-                TeleportToBestArea()
-                continue
-            end
-        end
-    end
-end
-
-local function CurrentAreaNumber()
-    if zoneData and zoneData.ZoneNumber then
-        return tonumber(zoneData.ZoneNumber) or 1
-    end
-
-    local ok, _, currentZoneData = pcall(GetMaxOwnedZone)
-    if ok and currentZoneData and currentZoneData.ZoneNumber then
-        return tonumber(currentZoneData.ZoneNumber) or 1
-    end
-
-    return 1
-end
-
-local RankCmds = require(Library.Client.RankCmds)
-
-local ProcessedBundles = {}
-
-local RankIDFromNumber = LPH_NO_VIRTUALIZE(function(Rank)
-	for RankName, RankData in Directory.Ranks do
-		if Rank == RankData.RankNumber then
-			return RankName
-		end
-	end
-
-	return nil
-end)
-
-local GetMaxPurchasableEggSlots = LPH_NO_VIRTUALIZE(function()
-    local total = 0
-
-    for i = 1, (DataInventory.Rank or 1) do
-        local rankId = RankIDFromNumber(i)
-        if rankId then
-            total += Directory.Ranks[rankId].UnlockableEggSlots
-        end
-    end
-
-    return total
-end)
-
-
-local GetStatus = LPH_NO_VIRTUALIZE(function(bundleEnd)
-    local bundleEndSlot, _, previousBundleEnd = RankCmds.GetEggBundle(bundleEnd)
-    local maxPurchasableSlots = GetMaxPurchasableEggSlots()
-    local purchasedSlots = DataInventory.EggSlotsPurchased
-
-    if bundleEndSlot <= purchasedSlots then
-        return "PURCHASED"
-    end
-
-    if bundleEndSlot == 1 or (purchasedSlots == previousBundleEnd and bundleEndSlot <= maxPurchasableSlots) then
-        return "NEXT"
-    end
-
-    if bundleEndSlot <= maxPurchasableSlots then
-        return "UNLOCKED"
-    end
-
-    return "LOCKED"
-end)
-
-local function GenerateBundles(rankData)
-    local slotsBeforeRank = RankCmds.GetEggSlotsBeforeRank(rankData.RankNumber)
-    local bundles = {}
-
-    for slotOffset = 1, rankData.UnlockableEggSlots do
-        local overallSlot = slotsBeforeRank + slotOffset
-
-        local bundleEnd, bundleSize, previousBundleEnd =
-            RankCmds.GetEggBundle(overallSlot)
-
-        local bundleData = {
-            BundleEnd = bundleEnd,
-            BundleSize = bundleSize,
-            PreviousBundleEnd = previousBundleEnd,
-            OverallSlot = overallSlot
-        }
-
-        local alreadyAdded = false
-
-        for _, existingBundle in ipairs(bundles) do
-            if existingBundle.BundleEnd == bundleEnd then
-                alreadyAdded = true
-                break
-            end
-        end
-
-        if not alreadyAdded then
-            table.insert(bundles, bundleData)
-        end
-    end
-
-    return bundles
-end
-
-local function teleportIfNeeded()
-	if (DataInventory.Rebirths or 0) < 9 then
-		if DataInventory.RecentWorld == 1 then
-			TeleportPlayer(CFrame.new(538, 17, 79))
-		elseif DataInventory.RecentWorld == 2 then
-			TeleportPlayer(CFrame.new(-9908, 18, -555))
-		elseif DataInventory.RecentWorld == 3 then
-			TeleportPlayer(CFrame.new(-10180, 3, -7374))
-		end
-
-		task.wait(0.4)
-	end
-end
-
-local function EggUpgrades()
-    if GetMaximumOverallZone().ZoneNumber < 8 then
-		return
-	end
-
-    local highestBundleEnd = 0
-
-    for _, rankData in Directory.Ranks do
-        local bundles = GenerateBundles(rankData)
-
-        for _, bundle in ipairs(bundles) do
-            highestBundleEnd = math.max(highestBundleEnd, bundle.BundleEnd)
-
-            if not ProcessedBundles[bundle.BundleEnd] then
-                local status = GetStatus(bundle.BundleEnd)
-
-				if status == "NEXT" then
-					local price = 0
-					local idk = bundle.BundleEnd - bundle.BundleSize
-
-					for i = 1, bundle.BundleSize do
-						price += Balancing.CalcEggSlotPrice(idk + i)
-					end
-					
-                    if GetItem("Currency", "Diamonds") < price then
-                        return
-                    end
-
-                    teleportIfNeeded()
-                    task.wait(0.2)
-
-                    print("Egg slot",Network.Invoke("EggHatchSlotsMachine_RequestPurchase", bundle.BundleEnd))
-				end
-            end
-        end
-    end
-end
-
-local FreeStuff = {
-    [1] = {
-        ["DailyDiamonds1"] = {
-            type = "DailyRewards_Redeem",
-            zone = 3
-        },
-        ["Upgrades_Purchase1"] = {
-            type = "Upgrades_Purchase",
-            zone = 4,
-            zoneName = "Green Forest",
-            upgradeType = "Diamonds",
-            tier = 1,
-            price = 200,
-            position = CFrame.new(755, 17, -243)
-        },
-        ["PotionVendingMachine1"] = {
-            type = "VendingMachines_Purchase",
-            zone = 6
-        },
-        ["Tap Damage1"] = {
-            type = "Upgrades_Purchase",
-            zone = 8,
-            zoneName = "Backyard",
-            upgradeType = "Tap Damage",
-            tier = 1,
-            price = 300,
-            position = CFrame.new(472, 17, 63)
-        },
-        ["EnchantVendingMachine1"] = {
-            type = "VendingMachines_Purchase",
-            zone = 9
-        },
-        ["Upgrades_Purchase2"] = {
-            type = "Upgrades_Purchase",
-            zone = 10,
-            zoneName = "Mine",
-            upgradeType = "Diamonds",
-            tier = 2,
-            price = 400,
-            position = CFrame.new(250, 17, 133)
-        },
-        ["PetSpeed1"] = {
-            type = "Upgrades_Purchase",
-            zone = 12,
-            zoneName = "Dead Forest",
-            upgradeType = "Pet Speed",
-            tier = 1,
-            price = 500,
-            position = CFrame.new(438, 17, 239)
-        },
-        ["FruitVendingMachine1"] = {
-            type = "VendingMachines_Purchase",
-            zone = 14
-        },
-        ["Drops1"] = {
-            type = "Upgrades_Purchase",
-            zone = 16,
-            zoneName = "Crimson Forest",
-            upgradeType = "Drops",
-            tier = 1,
-            price = 650,
-            position = CFrame.new(796, 17, 526)
-        },
-        ["DailyPotions1"] = {
-            type = "DailyRewards_Redeem",
-            zone = 17
-        },
-        ["Pet Damage1"] = {
-            type = "Upgrades_Purchase",
-            zone = 18,
-            zoneName = "Jungle Temple",
-            upgradeType = "Pet Damage",
-            tier = 1,
-            price = 700,
-            position = CFrame.new(467, 17, 535)
-        },
-        ["Diamonds3"] = {
-            type = "Upgrades_Purchase",
-            zone = 20,
-            zoneName = "Beach",
-            upgradeType = "Diamonds",
-            tier = 3,
-            price = 900,
-            position = CFrame.new(242, 16, 554)
-        },
-        ["DailyEnchants1"] = {
-            type = "DailyRewards_Redeem",
-            zone = 21
-        },
-        ["Luck1"] = {
-            type = "Upgrades_Purchase",
-            zone = 22,
-            zoneName = "Shipwreck",
-            upgradeType = "Diamonds",
-            tier = 1,
-            price = 1000,
-            position = CFrame.new(439, -31, 747)
-        },
-        ["DailyItems1"] = {
-            type = "DailyRewards_Redeem",
-            zone = 24
-        },
-        ["FruitVendingMachine2"] = {
-            type = "VendingMachines_Purchase",
-            zone = 26
-        },
-        ["Coins1"] = {
-            type = "Upgrades_Purchase",
-            zone = 26,
-            zoneName = "Pirate Cove",
-            upgradeType = "Coins",
-            tier = 1,
-            price = 1250,
-            position = CFrame.new(913, 17, 1042)
-        },
-        ["Tap Damage2"] = {
-            type = "Upgrades_Purchase",
-            zone = 28,
-            zoneName = "Shanty Town",
-            upgradeType = "Tap Damage",
-            tier = 2,
-            price = 1500,
-            position = CFrame.new(615, 17, 1058)
-        },
-        ["Pet Speed2"] = {
-            type = "Upgrades_Purchase",
-            zone = 30,
-            zoneName = "Fossil Digsite",
-            upgradeType = "Pet Speed",
-            tier = 2,
-            price = 1250,
-            position = CFrame.new(397, 17, 1125)
-        },
-        ["DailyDiamonds2"] = {
-            type = "DailyRewards_Redeem",
-            zone = 32
-        },
-        ["Diamonds4"] = {
-            type = "Upgrades_Purchase",
-            zone = 33,
-            zoneName = "Wild West",
-            upgradeType = "Diamonds",
-            tier = 4,
-            price = 3000,
-            position = CFrame.new(732, 16, 1234)
-        },
-        ["PotionVendingMachine2"] = {
-            type = "VendingMachines_Purchase",
-            zone = 35
-        },
-        ["Pet Damage2"] = {
-            type = "Upgrades_Purchase",
-            zone = 36,
-            zoneName = "Mountains",
-            upgradeType = "Pet Damage",
-            tier = 2,
-            price = 2500,
-            position = CFrame.new(1142, 16, 1365)
-        },
-        ["Coins2"] = {
-            type = "Upgrades_Purchase",
-            zone = 40,
-            zoneName = "Ski Town",
-            upgradeType = "Coins",
-            tier = 2,
-            price = 2750,
-            position = CFrame.new(688, 17, 1599)
-        },
-        ["EnchantVendingMachine2"] = {
-            type = "VendingMachines_Purchase",
-            zone = 42
-        },
-        ["Drops2"] = {
-            type = "Upgrades_Purchase",
-            zone = 44,
-            zoneName = "Obsidian Cave",
-            upgradeType = "Drops",
-            tier = 2,
-            price = 3000,
-            position = CFrame.new(1181, 16, 1711)
-        },
-        ["Luck2"] = {
-            type = "Upgrades_Purchase",
-            zone = 49,
-            zoneName = "Metal Dojo",
-            upgradeType = "Diamonds",
-            tier = 2,
-            price = 4500,
-            position = CFrame.new(1194, 17, 2144)
-        },
-        ["Luck3"] = {
-            type = "Upgrades_Purchase",
-            zone = 58,
-            zoneName = "Fairy Castle",
-            upgradeType = "Diamonds",
-            tier = 3,
-            price = 7500,
-            position = CFrame.new(475, 17, 2626)
-        },
-        ["Coins Damage2"] = {
-            type = "Upgrades_Purchase",
-            zone = 60,
-            zoneName = "Rainbow River",
-            upgradeType = "Coins",
-            tier = 3,
-            price = 7500,
-            position = CFrame.new(798, 17, 2629)
-        },
-        ["Diamonds5"] = {
-            type = "Upgrades_Purchase",
-            zone = 66,
-            zoneName = "Ice Castle",
-            upgradeType = "Diamonds",
-            tier = 5,
-            price = 12000,
-            position = CFrame.new(1152, 16, 3239)
-        },
-        ["Drops3"] = {
-            type = "Upgrades_Purchase",
-            zone = 68,
-            zoneName = "Firefly Cold Forest",
-            upgradeType = "Diamonds",
-            tier = 3,
-            price = 15000,
-            position = CFrame.new(825, 17, 3255)
-        },
-        ["Luck4"] = {
-            type = "Upgrades_Purchase",
-            zone = 77,
-            zoneName = "Haunted Mansion",
-            upgradeType = "Diamonds",
-            tier = 4,
-            price = 25000,
-            position = CFrame.new(475, 17, 2626)
-        },
-        ["DailyDiamonds3"] = {
-            type = "DailyRewards_Redeem",
-            zone = 78
-        },
-        ["DailyPotions2"] = {
-            type = "DailyRewards_Redeem",
-            zone = 83
-        },
-        ["DailyEnchants2"] = {
-            type = "DailyRewards_Redeem",
-            zone = 88
-        },
-        ["DailyItems2"] = {
-            type = "DailyRewards_Redeem",
-            zone = 90
-        },
-
-        -- new
-    
-    ["Pet Damage4"] = {
-        type = "Upgrades_Purchase",
-        zone = "Cloud Houses",
-        zoneName = "Cloud Houses",
-        upgradeType = "Pet Damage",
-        tier = 4,
-        price = 75000,
-        position = CFrame.new(-36, 123, 5394)
-    },
-
-    ["Luck1"] = {
-        type = "Upgrades_Purchase",
-        zone = "Shipwreck",
-        zoneName = "Shipwreck",
-        upgradeType = "Luck",
-        tier = 1,
-        price = 1000,
-        position = CFrame.new(440, -28, 752)
-    },
-
-    ["Coins1"] = {
-        type = "Upgrades_Purchase",
-        zone = "Pirate Cove",
-        zoneName = "Pirate Cove",
-        upgradeType = "Coins",
-        tier = 1,
-        price = 1250,
-        position = CFrame.new(914, 22, 1050)
-    },
-
-    ["Diamonds4"] = {
-        type = "Upgrades_Purchase",
-        zone = "Wild West",
-        zoneName = "Wild West",
-        upgradeType = "Diamonds",
-        tier = 4,
-        price = 2000,
-        position = CFrame.new(730, 22, 1225)
-    },
-
-    ["Drops2"] = {
-        type = "Upgrades_Purchase",
-        zone = "Obsidian Cave",
-        zoneName = "Obsidian Cave",
-        upgradeType = "Drops",
-        tier = 2,
-        price = 3000,
-        position = CFrame.new(1181, 22, 1702)
-    },
-
-    ["Diamonds6"] = {
-        type = "Upgrades_Purchase",
-        zone = "Colorful Clouds",
-        zoneName = "Colorful Clouds",
-        upgradeType = "Diamonds",
-        tier = 6,
-        price = 100000,
-        position = CFrame.new(-36, 123, 6186)
-    },
-
-    ["Pet Speed5"] = {
-        type = "Upgrades_Purchase",
-        zone = "Carnival",
-        zoneName = "Carnival",
-        upgradeType = "Pet Speed",
-        tier = 5,
-        price = 60000,
-        position = CFrame.new(-35, 23, 4397)
-    },
-
-    ["Coins4"] = {
-        type = "Upgrades_Purchase",
-        zone = "Gummy Forest",
-        zoneName = "Gummy Forest",
-        upgradeType = "Coins",
-        tier = 4,
-        price = 45000,
-        position = CFrame.new(510, 23, 4320)
-    },
-
-    ["Tap Damage4"] = {
-        type = "Upgrades_Purchase",
-        zone = "Witch Marsh",
-        zoneName = "Witch Marsh",
-        upgradeType = "Tap Damage",
-        tier = 4,
-        price = 17500,
-        position = CFrame.new(289, 23, 3634)
-    },
-
-    ["Luck4"] = {
-        type = "Upgrades_Purchase",
-        zone = "Haunted Mansion",
-        zoneName = "Haunted Mansion",
-        upgradeType = "Luck",
-        tier = 4,
-        price = 25000,
-        position = CFrame.new(640, 23, 3711)
-    },
-
-    ["Pet Damage1"] = {
-        type = "Upgrades_Purchase",
-        zone = "Jungle Temple",
-        zoneName = "Jungle Temple",
-        upgradeType = "Pet Damage",
-        tier = 1,
-        price = 700,
-        position = CFrame.new(467, 22, 529)
-    },
-
-    ["Tap Damage2"] = {
-        type = "Upgrades_Purchase",
-        zone = "Shanty Town",
-        zoneName = "Shanty Town",
-        upgradeType = "Tap Damage",
-        tier = 2,
-        price = 1500,
-        position = CFrame.new(600, 22, 1050)
-    },
-
-    ["Pet Speed3"] = {
-        type = "Upgrades_Purchase",
-        zone = "Fairytale Castle",
-        zoneName = "Fairytale Castle",
-        upgradeType = "Pet Speed",
-        tier = 3,
-        price = 5500,
-        position = CFrame.new(288, 22, 2539)
-    },
-
-    ["Pet Damage2"] = {
-        type = "Upgrades_Purchase",
-        zone = "Mountains",
-        zoneName = "Mountains",
-        upgradeType = "Pet Damage",
-        tier = 2,
-        price = 2500,
-        position = CFrame.new(1152, 22, 1363)
-    },
-
-    ["Diamonds1"] = {
-        type = "Upgrades_Purchase",
-        zone = "Green Forest",
-        zoneName = "Green Forest",
-        upgradeType = "Diamonds",
-        tier = 1,
-        price = 200,
-        position = CFrame.new(757, 22, -237)
-    },
-
-    ["Coins3"] = {
-        type = "Upgrades_Purchase",
-        zone = "Rainbow River",
-        zoneName = "Rainbow River",
-        upgradeType = "Coins",
-        tier = 3,
-        price = 7500,
-        position = CFrame.new(802, 22, 2633)
-    },
-
-    ["Luck3"] = {
-        type = "Upgrades_Purchase",
-        zone = "Fairy Castle",
-        zoneName = "Fairy Castle",
-        upgradeType = "Luck",
-        tier = 3,
-        price = 7500,
-        position = CFrame.new(483, 22, 2633)
-    },
-
-    ["Drops1"] = {
-        type = "Upgrades_Purchase",
-        zone = "Crimson Forest",
-        zoneName = "Crimson Forest",
-        upgradeType = "Drops",
-        tier = 1,
-        price = 650,
-        position = CFrame.new(794, 22, 530)
-    },
-
-    ["Diamonds2"] = {
-        type = "Upgrades_Purchase",
-        zone = "Mine",
-        zoneName = "Mine",
-        upgradeType = "Diamonds",
-        tier = 2,
-        price = 400,
-        position = CFrame.new(246, 22, 137)
-    },
-
-    ["Coins2"] = {
-        type = "Upgrades_Purchase",
-        zone = "Ski Town",
-        zoneName = "Ski Town",
-        upgradeType = "Coins",
-        tier = 2,
-        price = 2750,
-        position = CFrame.new(695, 22, 1602)
-    },
-
-    ["Diamonds5"] = {
-        type = "Upgrades_Purchase",
-        zone = "Ice Castle",
-        zoneName = "Ice Castle",
-        upgradeType = "Diamonds",
-        tier = 5,
-        price = 12000,
-        position = CFrame.new(1153, 23, 3248)
-    },
-
-    ["Tap Damage3"] = {
-        type = "Upgrades_Purchase",
-        zone = "Zen Garden",
-        zoneName = "Zen Garden",
-        upgradeType = "Tap Damage",
-        tier = 3,
-        price = 8000,
-        position = CFrame.new(348, 22, 2151)
-    },
-
-    ["Luck2"] = {
-        type = "Upgrades_Purchase",
-        zone = "Metal Dojo",
-        zoneName = "Metal Dojo",
-        upgradeType = "Luck",
-        tier = 2,
-        price = 4500,
-        position = CFrame.new(1191, 22, 2151)
-    },
-
-    ["Pet Damage3"] = {
-        type = "Upgrades_Purchase",
-        zone = "Samurai Village",
-        zoneName = "Samurai Village",
-        upgradeType = "Pet Damage",
-        tier = 3,
-        price = 7500,
-        position = CFrame.new(666, 22, 2151)
-    },
-
-    ["Pet Speed1"] = {
-        type = "Upgrades_Purchase",
-        zone = "Dead Forest",
-        zoneName = "Dead Forest",
-        upgradeType = "Pet Speed",
-        tier = 1,
-        price = 500,
-        position = CFrame.new(442, 22, 233)
-    },
-
-    ["Diamonds3"] = {
-        type = "Upgrades_Purchase",
-        zone = "Beach",
-        zoneName = "Beach",
-        upgradeType = "Diamonds",
-        tier = 3,
-        price = 900,
-        position = CFrame.new(251, 22, 555)
-    },
-
-    ["Pet Speed2"] = {
-        type = "Upgrades_Purchase",
-        zone = "Fossil Digsite",
-        zoneName = "Fossil Digsite",
-        upgradeType = "Pet Speed",
-        tier = 2,
-        price = 1250,
-        position = CFrame.new(389, 22, 1125)
-    },
-
-    ["Tap Damage1"] = {
-        type = "Upgrades_Purchase",
-        zone = "Backyard",
-        zoneName = "Backyard",
-        upgradeType = "Tap Damage",
-        tier = 1,
-        price = 300,
-        position = CFrame.new(466, 22, 59)
-    },
-
-    ["Drops3"] = {
-        type = "Upgrades_Purchase",
-        zone = "Firefly Cold Forest",
-        zoneName = "Firefly Cold Forest",
-        upgradeType = "Drops",
-        tier = 3,
-        price = 15000,
-        position = CFrame.new(823, 23, 3248)
-    },
-
-    },
-    [2] = {
-        ["DailyDiamonds4"] = {
-            type = "DailyRewards_Redeem",
-            zone = 101
-        },
-        ["PotionVendingMachine3"] = {
-            type = "VendingMachines_Purchase",
-            zone = 108
-        },
-        ["DailyPotions3"] = {
-            type = "DailyRewards_Redeem",
-            zone = 113
-        },
-        ["EnchantVendingMachine3"] = {
-            type = "VendingMachines_Purchase",
-            zone = 115
-        },
-        ["DailyEnchants3"] = {
-            type = "DailyRewards_Redeem",
-            zone = 122
-        },
-        ["PotionVendingMachine4"] = {
-            type = "VendingMachines_Purchase",
-            zone = 126
-        },
-        ["DailyItems3"] = {
-            type = "DailyRewards_Redeem",
-            zone = 130
-        },
-        ["DailyDiamonds5"] = {
-            type = "DailyRewards_Redeem",
-            zone = 135
-        },
-        ["EnchantVendingMachine4"] = {
-            type = "VendingMachines_Purchase",
-            zone = 138
-        },
-        ["BundleVendingMachine"] = {
-            type = "VendingMachines_Purchase",
-            zone = 142,
-        },
-        ["DailyPotions4"] = {
-            type = "DailyRewards_Redeem",
-            zone = 146
-        },
-        ["EnchantVendingMachine5"] = {
-            type = "VendingMachines_Purchase",
-            zone = 155
-        },
-        ["PotionVendingMachine5"] = {
-            type = "VendingMachines_Purchase",
-            zone = 165
-        },
-        ["DailyEnchants4"] = {
-            type = "DailyRewards_Redeem",
-            zone = 172
-        },
-        ["BundleVendingMachine2"] = {
-            type = "VendingMachines_Purchase",
-            zone = 180
-        },
-        ["DailyPotions5"] = {
-            type = "DailyRewards_Redeem",
-            zone = 185
-        },
-        ["FruitVendingMachine3"] = {
-            type = "VendingMachines_Purchase",
-            zone = 190
-        },
-        ["DailyDiamonds6"] = {
-            type = "DailyRewards_Redeem",
-            zone = 195
-        },
-    },
-    [3] = {
-        ["DailyEnchants5"] = {
-            type = "DailyRewards_Redeem",
-            zone = 202
-        },
-        ["DailyDiamonds7"] = {
-            type = "DailyRewards_Redeem",
-            zone = 205
-        },
-        ["DailyItems5"] = {
-            type = "DailyRewards_Redeem",
-            zone = 206
-        },
-        ["DailyItems6"] = {
-            type = "DailyRewards_Redeem",
-            zone = 231
-        },
-        ["BundleVendingMachine4"] = {
-            type = "VendingMachines_Purchase",
-            zone = 236
-        },
-    },
-    [4] = {
-        ["PotionVendingMachine7"] = {
-            type = "VendingMachines_Purchase",
-            zone = 242,
-            position = Vector3.new(-15391, 16, -338)
-        },
-        ["DailyPotions7"] = {
-            type = "DailyRewards_Redeem",
-            zone = 243
-        },
-        ["DailyEnchants7"] = {
-            type = "DailyRewards_Redeem",
-            zone = 247
-        },
-        ["DailyDiamonds9"] = {
-            type = "DailyRewards_Redeem",
-            zone = 253
-        },
-        ["DailyItems7"] = {
-            type = "DailyRewards_Redeem",
-            zone = 263
-        },
-        ["BundleVendingMachine5"] = {
-            type = "VendingMachines_Purchase",
-            zone = 273
+local function SellerNotification(CurrentInfo)
+    local BoothCount, ItemCount = FindItemsInBooth(CurrentInfo.ID, CurrentInfo.Class)
+    local Description = {
+        "**<:Box:1239350602413375591> Sold:** `"..CurrentInfo.Name.." x"..CurrentInfo.Amount.."`",
+        "**<:Diamond:1235403834969296896> Gained:** `"..AddSuffix(CurrentInfo.Spent)..(CurrentInfo.Amount > 1 and " ("..AddSuffix(CurrentInfo.Spent / CurrentInfo.Amount).." per)`" or "`"),
+        "**<:Booth:1239350605294604378> Booth Count:** `"..AddCommas(ItemCount).."`",
+        "**<:Bank:1295944894698754102> Current Diamonds:** `"..AddSuffix(GetDiamonds()).."`",
+        "**<:Misc:1236020543082463253> Total Huges:** `"..AddCommas(GetTotalHuges()).."`",
+        "**<:Misc:1236020543082463253> Total Gifts:** `"..AddCommas(GetItemAmount("Obsidian Gift")).."`",
+        "**<:Misc:1236020543082463253> Total Mini Pinata:** `"..AddCommas(GetItemAmount("Mini Pinata")).."`",
+        "**<:Misc:1236020543082463253> Total Insta Plant Capsule:** `"..AddCommas(GetItemAmount("Insta Plant Capsule")).."`",
+        "**<:Misc:1236020543082463253> Total Rainbow Mini Chest:** `"..AddCommas(GetItemAmount("Rainbow Mini Chest")).."`",
+        "**<:Misc:1236020543082463253> Keys:** `C:"..AddCommas(GetItemAmount("Crystal Key")).." S:"..AddCommas(GetItemAmount("Secret Key")).." T:"..AddCommas(GetItemAmount("Tech Key")).." V:"..AddCommas(GetItemAmount("Void Key")).."`",
+    }
+
+    local Message = {
+		["username"] = "badu | plaza",
+		["avatar_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
+        ["embeds"] = {
+            {
+                ["color"] = 12035327,
+                ["title"] = "||"..LocalPlayer.Name.."|| has sold an item!",
+                ["description"] = table.concat(Description, "\n"),
+                ["timestamp"] = DateTime.now():ToIsoDate(),
+                ["footer"] = {
+                    ["icon_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
+                    ["text"] = "badu"
+                },
+                ["thumbnail"] = {
+                    ["url"] = "https://biggamesapi.io/image/"..Library.Functions.ParseAssetId(CurrentInfo.Icon)
+                },
+            },
         },
     }
-}
+	local thing = request({
+		Url = UI["URL"],
+		Method = "POST",
+		Headers = {["Content-Type"] = "application/json", ["User-Agent"] = "PlazaPlus"},
+		Body = HttpService:JSONEncode(Message)
+	})
+	if type(thing) == "table" then
+		local code = thing.StatusCode or thing.status_code or thing.Status or thing.status
+		print("[Plaza Plus]: Webhook -> Status:", code, "| Body:", tostring(thing.Body or thing.body))
+	else
+		warn("[Plaza Plus]: Webhook -> 'request' cevap dondurmedi. URL dogru mu? ->", tostring(UI["URL"]))
+	end
+end
 
-local function DoUpgrades()
-    EggUpgrades()
-
-    for name, data in pairs(FreeStuff[tonumber(DataInventory.RecentWorld)] or {}) do
-        if type(data.zone) == "string" then
-            local zoneId, zoneData = ZoneUtils.GetZoneFromId(data.zoneName)
-            data.zone = zoneData and zoneData.ZoneNumber or math.huge
-        end
-
-        if zoneData.ZoneNumber >= data.zone then
-
-            -- DAILY REWARDS
-            if data.type == "DailyRewards_Redeem" then
-                local timestamps = DataInventory.TimedRewardTimestamps or {}
-                local cooldown = Directory.TimedRewards[name] and Directory.TimedRewards[name].Cooldown or 0
-                local nextClaim = (timestamps[name] or 0) + cooldown
-
-                if nextClaim <= workspace:GetServerTimeNow() then
-                    StatusUpdate("Auto-rank: daily reward ready " .. tostring(name))
-                    StatusUpdate("Claiming Daily reward: " .. tostring(name))
-
-                    if data.position then
-                        TeleportPlayer(data.position)
-                    else
-                        TeleportToArea(data.zone)
-                    end
-
-                    task.wait(0.1)
-
-                    Network.Fire("Machines: Mark Approached", name)
-
-                    local success, err
-
-                    for attempt = 1, 15 do
-                        success, err = Network.Invoke("DailyRewards_Redeem", name)
-
-                        if success then
-                            break
-                        end
-
-                        task.wait(0.1)
-                    end
-
-                    if success then
-                        StatusUpdate("Claimed Daily reward: " .. tostring(name))
-
-                        local timestampsCopy = {}
-
-                        for k, v in pairs(DataInventory.TimedRewardTimestamps or {}) do
-                            timestampsCopy[k] = v
-                        end
-
-                        timestampsCopy[name] = workspace:GetServerTimeNow()
-
-                        UpdatePlayerData("TimedRewardTimestamps", timestampsCopy)
-                    else
-                        StatusUpdate(
-                            "Failed Daily reward: "
-                                .. tostring(name)
-                                .. " Error: "
-                                .. tostring(err)
-                        )
-                    end
-                end
-
-                continue
-            end
-
-            if data.type == "VendingMachines_Purchase" then
-                local stocks = DataInventory.VendingStocks or {}
-                local currentStock = stocks[name] or 4
-                if currentStock <= 0 then
-                    continue
-                end
-
-                if data.position then
-                    TeleportPlayer(data.position)
+local TempRAP = {}
+local function ProcessItem(CurrentInfo, Data, Booth)
+    FindInfo = Data.FindInfo
+    Percent = nil
+    Result = nil
+    if CurrentInfo.RAP then
+        if not Data.UseCosmicValues and not Data.DetectManipulation then
+            Percent = CalculatePercent(CurrentInfo.RAP, CurrentInfo.Cost)
+        elseif Data.UseCosmicValues then
+            local CosmicValues = FileSettings.UseCosmicValues or {Time = os.time()}
+            local CosmicValue = CosmicValues[CurrentInfo.Display]
+            if CosmicValue and CosmicValue ~= "nil" then
+                CurrentInfo.Value = CosmicValue
+                Percent = CalculatePercent(CosmicValue, CurrentInfo.Cost)
+            elseif not CosmicValue and CosmicValue ~= "nil" then
+                ItemValue = ReturnValue(CurrentInfo.Display)
+                if ItemValue then
+                    CurrentInfo.Value = ItemValue
+                    Percent = CalculatePercent(ItemValue, CurrentInfo.Cost)
+                    CosmicValues[CurrentInfo.Display] = ItemValue
                 else
-                    TeleportToArea(data.zone)
-                end
-                task.wait(0.2)
-
-                Network.Fire("Machines: Mark Approached", name)
-
-                local machineData = Directory.VendingMachines[name]
-
-                if not machineData then
-                    continue
-                end
-
-                repeat
-                    stocks = DataInventory.VendingStocks or {}
-                    currentStock = stocks[name] or 4
-
-                    if currentStock <= 0 then
-                        break
-                    end
-
-                    StatusUpdate("Auto-rank: vending machine purchase attempt " .. tostring(name) .. " stock=" .. tostring(currentStock))
-
-
-                    local amount = 1
-                    local price = machineData.CurrencyCost
-                    local currentCoins = GetItem(
-                        "Currency",
-                        machineData.CurrencyType,
-                        false
-                    )
-
-                    if currentCoins < price then
-                        break
-                    end
-
-                    StatusUpdate(
-                        "Buying Vending machine: "
-                            .. tostring(name)
-                            .. " | Stock: "
-                            .. tostring(currentStock)
-                            .. " | Buying: "
-                            .. tostring(amount)
-                    )
-
-                    local success, err = Network.Invoke(
-                        "VendingMachines_Purchase",
-                        name,
-                        amount
-                    )
-
-                    if success then
-                        local stocksCopy = {}
-
-                        for k, v in pairs(stocks) do
-                            stocksCopy[k] = v
-                        end
-
-                        stocksCopy[name] = math.max(currentStock - amount, 0)
-
-                        UpdatePlayerData("VendingStocks", stocksCopy)
-
-                        StatusUpdate(
-                            "Bought Vending machine: "
-                                .. tostring(name)
-                                .. " | Stock: "
-                                .. tostring(stocksCopy[name])
-                        )
-                    else
-                        StatusUpdate(
-                            "Failed purchase Vending machine: "
-                                .. tostring(name)
-                                .. " Error: "
-                                .. tostring(err)
-                        )
-
-                        break
-                    end
-
-                    task.wait(0.25)
-
-                until false
-
-                continue
-            end
-
-            if data.type == "Upgrades_Purchase" then
-                local UpgradesOwned = DataInventory.UpgradesOwned or {}
-                local UpgradeOwnedList = UpgradesOwned[data.upgradeType] or {}
-                local hasTier = false
-
-                for _, idk in pairs(UpgradeOwnedList) do
-                    if tonumber(idk) == tonumber(data.tier) then
-                        hasTier = true
-                    end
-                end
-
-                if not hasTier then
-                    local diamonds = GetItem("Currency", "Diamonds", false)
-
-                    if Config["MaxUpgradeCost"] then
-                        if Config["MaxUpgradeCost"] < data.price then
-                            continue
-                        end
-                    end
-
-                    if diamonds > data.price then
-                        StatusUpdate("Auto-rank: upgrade ready " .. tostring(name) .. " cost=" .. tostring(data.price) .. " diamonds=" .. tostring(diamonds))
-                        local success, err = nil, nil
-
-                        repeat
-                            StatusUpdate(
-                                "Buying Upgrade: " ..
-                                name .. " [" ..
-                                utils:FormatNumber(diamonds) ..
-                                "/" ..
-                                utils:FormatNumber(data.price) ..
-                                "]"
-                            )
-
-                            TeleportPlayer(data.position)
-
-                            success, err = Network.Invoke(
-                                "Upgrades_Purchase",
-                                data.upgradeType,
-                                data.zoneName
-                            )
-
-                            if success then
-                                StatusUpdate("Purchased Upgrade: " .. tostring(name))
-
-                                local upgradesCopy = {}
-
-                                for k, v in pairs(DataInventory.UpgradesOwned or {}) do
-                                    upgradesCopy[k] = v
-                                end
-
-                                local listCopy = {}
-
-                                for _, v in pairs(upgradesCopy[data.upgradeType] or {}) do
-                                    table.insert(listCopy, v)
-                                end
-
-                                if not table.find(listCopy, data.tier) then
-                                    table.insert(listCopy, data.tier)
-                                end
-
-                                upgradesCopy[data.upgradeType] = listCopy
-
-                                UpdatePlayerData("UpgradesOwned", upgradesCopy)
-                            end
-
-                            UpgradesOwned = DataInventory.UpgradesOwned or {}
-                            UpgradeOwnedList = UpgradesOwned[data.upgradeType] or {}
-
-                            task.wait(0.05)
-
-                            for _, idk in pairs(UpgradeOwnedList) do
-                                if tonumber(idk) == tonumber(data.tier) then
-                                    hasTier = true
-                                end
-                            end
-
-                        until hasTier
-                        task.wait(1)
-                    end
+                    CosmicValues[CurrentInfo.Display] = "nil"
                 end
             end
+            if os.time() - CosmicValues.Time >= 7200 then
+                CosmicValues.Time = os.time()
+            end
+            FileSettings.UseCosmicValues = CosmicValues
+            Save()
+        elseif Data.DetectManipulation then
+            local ManipulationData = FileSettings.DetectManipulation or {Time = os.time()}
+            local ManipulatedInfo = ManipulationData[CurrentInfo.Display]
+            if ManipulatedInfo and ManipulatedInfo.RAP == CurrentInfo.RAP then
+                Result = ManipulatedInfo.Result
+                TempRAP[CurrentInfo.Display] = Result
+            else
+                pcall(function()
+                    RAPData = HttpService:JSONDecode(game:HttpGet("https://ps99rap.com/api/get/rap?id=" .. CurrentInfo.Display:lower():gsub(" ", "%%20"))).data
+                end)
+                if RAPData then
+                    Result = DetermineTrend(RAPData)
+                    TempRAP[CurrentInfo.Display] = Result
+                    ManipulationData[CurrentInfo.Display] = {Result = Result, RAP = CurrentInfo.RAP}
+                end
+            end
+            if os.time() - ManipulationData.Time >= 7200 then
+                ManipulationData.Time = os.time()
+            end
+            FileSettings.DetectManipulation = ManipulationData
+            Percent = (Result and Result ~= "Manipulated") and CalculatePercent(CurrentInfo.RAP, CurrentInfo.Cost) or nil
+            Save()
         end
     end
-end
+    if Percent and Percent < 0 then
+        TempPercent = math.abs(Percent).."% ABOVE RAP"
+    elseif Percent and Percent > 0 then
+        TempPercent = Percent.."% BELOW RAP"
+    else
+        TempPercent = "N/A%"
+    end
+    print("[Plaza Plus]: Found: " .. CurrentInfo.Display .. " @ " .. TempPercent .. " (" .. tostring(CurrentInfo.Value or CurrentInfo.Cost) .. ") ".."("..tostring(Result)..")")
 
-if Config["Rank Before"] then
-if CurrentAreaNumber() < 11 then
-    StatusUpdate("Auto-rank: preparing area progression to 11, current area " .. tostring(CurrentAreaNumber()))
-    repeat
-        Name,zoneData = GetMaxOwnedZone()
-        NextName, nextData = GetNextZone()
-        TeleportToBestArea()
-        task.wait(0.1)
+    local PriceData = {
+        IsPercentage = type(Data.Price) == "string" and Data.Price:find("%%"),
+        AboveRAP = type(Data.Price) == "string" and Data.Price:find("+"),
+        --NegativePrice = (type(Data.Price) == "number" and Data.Price < 0) or (type(Data.Price) == "string" and Data.Price:find("^%-")),
+    }
+    PriceData.RealPrice = tonumber(type(Data.Price) == "string" and (not PriceData.IsPercentage and RemoveSuffix(Data.Price) or Data.Price:gsub("%D", "")) or Data.Price)
 
-        local coins = tonumber(GetItem("Currency", WorldsUtil.GetWorldCurrencyId())) or 0
-        local price = nextData and (tonumber(CalcGatePrice(nextData)) or math.huge) or math.huge
-        
-        if coins > price then
-            StatusUpdate("Buying Zone " .. tostring(NextName))
-            local success, err = TryPurchaseNextZone(NextName, nextData)
-            if success then
-                StatusUpdate("Purchased Zone " .. tostring(NextName))
-            end
-        else
-            StatusUpdate("Earning Coins for " .. tostring(NextName) .. " " .. utils:FormatNumber(coins) .. "/" .. utils:FormatNumber(price))
-        end
-        DoUpgrades()
-        PurchaseBestEgg()
-    until CurrentAreaNumber() >= 11
-end
+    local HasEnoughDiamonds = GetDiamonds() >= CurrentInfo.Cost
+    local IsValidPrice = false
 
-if CurrentRankNumber() < 3 then
-    StatusUpdate("Auto-rank: preparing rank progression to 3, current rank " .. tostring(CurrentRankNumber()))
-    TeleportToBestArea()
-    repeat
-        DoEasyQuest()
-        DoQuest()
-        DoUpgrades()
-        task.wait(0.1)
-        PurchaseBestEgg()
-        StatusUpdate("Auto-rank: preparing rank progression to 3, current rank " .. tostring(CurrentRankNumber()))
-    until CurrentRankNumber() >= 3
-end
 
-if (DataInventory.Rebirths or 0) < 1 and CurrentAreaNumber() < 25 then
-    StatusUpdate("Auto-rank: area progress toward 25 before rebirth 1, current area " .. tostring(CurrentAreaNumber()))
-    repeat
-        task.wait(0.25)
-        Name,zoneData = GetMaxOwnedZone()
-        NextName, nextData = GetNextZone()
-
-        TeleportToBestArea()
-
-        local coins = tonumber(GetItem("Currency", WorldsUtil.GetWorldCurrencyId())) or 0
-        local price = nextData and (tonumber(CalcGatePrice(nextData)) or math.huge) or math.huge
-        
-        if coins > price then
-            StatusUpdate("Buying Zone " .. tostring(NextName))
-            local success, err = TryPurchaseNextZone(NextName, nextData)
-            if success then
-                StatusUpdate("Purchased Zone " .. tostring(NextName))
-            end
-        else
-            StatusUpdate("Earning Coins for " .. tostring(NextName) .. " " .. utils:FormatNumber(coins) .. "/" .. utils:FormatNumber(price))
-        end
-        DoQuest()
-        PurchaseBestEgg()
-        DoUpgrades()
-    until CurrentAreaNumber() >= 25
-
-    repeat
-        Network.Invoke("Rebirth_Request","1")
-        task.wait(0.5)
-    until (DataInventory.Rebirths or 0) >= 1
-end
-
-if CurrentRankNumber() < 5 then
-    StatusUpdate("Auto-rank: progressing rank to 5, current rank " .. tostring(CurrentRankNumber()))
-    TeleportToBestArea()
-    repeat
-        DoEasyQuest()
-        DoQuest()
-        DoUpgrades()
-        PurchaseBestEgg()
-        task.wait(0.1)
-        StatusUpdate("Auto-rank: progressing rank to 5, current rank " .. tostring(CurrentRankNumber()))
-    until CurrentRankNumber() >= 5
-end
-
-if (DataInventory.Rebirths or 0) < 2 and CurrentAreaNumber() < 50 then
-    StatusUpdate("Auto-rank: area progress toward 50 before rebirth 2, current area " .. tostring(CurrentAreaNumber()))
-    repeat
-        task.wait(0.25)
-        Name,zoneData = GetMaxOwnedZone()
-        NextName, nextData = GetNextZone()
-
-        TeleportToBestArea()
-
-        local coins = tonumber(GetItem("Currency", WorldsUtil.GetWorldCurrencyId())) or 0
-        local price = nextData and (tonumber(CalcGatePrice(nextData)) or math.huge) or math.huge
-        
-        if coins > price then
-            StatusUpdate("Buying Zone " .. tostring(NextName))
-            local success, err = TryPurchaseNextZone(NextName, nextData)
-            if success then
-                StatusUpdate("Purchased Zone " .. tostring(NextName))
-            end
-        else
-            StatusUpdate("Earning Coins for " .. tostring(NextName) .. " " .. utils:FormatNumber(coins) .. "/" .. utils:FormatNumber(price))
-        end
-        DoQuest()
-        PurchaseBestEgg()
-        DoUpgrades()
-    until CurrentAreaNumber() >= 50
-
-    repeat
-        Network.Invoke("Rebirth_Request","2")
-        task.wait(0.5)
-    until (DataInventory.Rebirths or 0) >= 2
-end
-
-if (DataInventory.Rebirths or 0) < 3 and CurrentAreaNumber() < 75 then
-    StatusUpdate("Auto-rank: area progress toward 75 before rebirth 3, current area " .. tostring(CurrentAreaNumber()))
-    repeat
-        task.wait(0.25)
-        Name,zoneData = GetMaxOwnedZone()
-        NextName, nextData = GetNextZone()
-
-        TeleportToBestArea()
-
-        local coins = tonumber(GetItem("Currency", WorldsUtil.GetWorldCurrencyId())) or 0
-        local price = nextData and (tonumber(CalcGatePrice(nextData)) or math.huge) or math.huge
-        
-        if coins > price then
-            StatusUpdate("Buying Zone " .. tostring(NextName))
-            local success, err = TryPurchaseNextZone(NextName, nextData)
-            if success then
-                StatusUpdate("Purchased Zone " .. tostring(NextName))
-            end
-        else
-            StatusUpdate("Earning Coins for " .. tostring(NextName) .. " " .. utils:FormatNumber(coins) .. "/" .. utils:FormatNumber(price))
-        end
-        DoQuest()
-        PurchaseBestEgg()
-        DoUpgrades()
-    until CurrentAreaNumber() >= 75
-
-    repeat
-        Network.Invoke("Rebirth_Request","3")
-        task.wait(0.5)
-    until (DataInventory.Rebirths or 0) >= 3
-end
-
-if CurrentAreaNumber() < 90 then
-    StatusUpdate("Auto-rank: area progression toward 90, current area " .. tostring(CurrentAreaNumber()))
-    repeat
-        task.wait(0.25)
-        Name,zoneData = GetMaxOwnedZone()
-        NextName, nextData = GetNextZone()
-
-        TeleportToBestArea()
-
-        local coins = tonumber(GetItem("Currency", WorldsUtil.GetWorldCurrencyId())) or 0
-        local price = nextData and (tonumber(CalcGatePrice(nextData)) or math.huge) or math.huge
-        
-        if coins > price then
-            StatusUpdate("Buying Zone " .. tostring(NextName))
-            local success, err = TryPurchaseNextZone(NextName, nextData)
-            if success then
-                StatusUpdate("Purchased Zone " .. tostring(NextName))
-            end
-        else
-            StatusUpdate("Earning Coins for " .. tostring(NextName) .. " " .. utils:FormatNumber(coins) .. "/" .. utils:FormatNumber(price))
-        end
-        DoQuest()
-        PurchaseBestEgg()
-        DoUpgrades()
-    until CurrentAreaNumber() >= 90
-end
-
-if CurrentRankNumber() < 8 then
-    StatusUpdate("Auto-rank: progressing rank to 8, current rank " .. tostring(CurrentRankNumber()))
-    TeleportToBestArea()
-    StatusUpdate("Auto-rank: starting rank 8 grind")
-    repeat
-        DoEasyQuest()
-        DoQuest()
-        DoUpgrades()
-        PurchaseBestEgg()
-        task.wait(0.1)
-        StatusUpdate("Auto-rank: progressing rank to 8, current rank " .. tostring(CurrentRankNumber()))
-    until CurrentRankNumber() >= 8
-end
-
-if (DataInventory.Rebirths or 0) < 4 and CurrentAreaNumber() < 99 then
-    StatusUpdate("Auto-rank: area progress toward 99 before rebirth 4, current area " .. tostring(CurrentAreaNumber()))
-    repeat
-        task.wait(0.25)
-        Name,zoneData = GetMaxOwnedZone()
-        NextName, nextData = GetNextZone()
-
-        TeleportToBestArea()
-
-        local coins = tonumber(GetItem("Currency", WorldsUtil.GetWorldCurrencyId())) or 0
-        local price = nextData and (tonumber(CalcGatePrice(nextData)) or math.huge) or math.huge
-        
-        if coins > price then
-            StatusUpdate("Buying Zone " .. tostring(NextName))
-            local success, err = TryPurchaseNextZone(NextName, nextData)
-            if success then
-                StatusUpdate("Purchased Zone " .. tostring(NextName))
-            end
-        else
-            StatusUpdate("Earning Coins for " .. tostring(NextName) .. " " .. utils:FormatNumber(coins) .. "/" .. utils:FormatNumber(price))
-        end
-        DoQuest()
-        PurchaseBestEgg()
-        DoUpgrades()
-    until CurrentAreaNumber() >= 99 or NextName == nil
-
-    repeat
-        Network.Invoke("Rebirth_Request","4")
-        task.wait(0.5)
-    until (DataInventory.Rebirths or 0) >= 4
-    task.wait(30)
-end
-end
--- hier auto rankl ende
-
-if InstancingCmds.instanceId ~= "TapHeroes" or not InstancingCmds.instanceObj then
-    repeat
-        Network.Invoke("Instancing_PlayerEnterInstance", "TapHeroes")
-        Network.Fire("Instances: Mark Entered", "TapHeroes")
-        TeleportPlayer(Vector3.new(-4694, 1611, -1595))
-        task.wait(0.05)
-    until InstancingCmds.instanceId == "TapHeroes" and InstancingCmds.instanceObj
-end
-
-local LastBossChange = 0
-local LastBossTimer = 0
-local LastLevel = DataInventory.TapHeroes.MaxZone or 1
-local BossLevel = LastLevel
-local OldMax = DataInventory.TapHeroes.MaxZone or 1
-
-local BossActive = false
-local BossDespawnTime = 0
-
--- Transcend sayaci: state paketinin [13]. arg'indan DOGRUDAN okunur.
--- Bilerek DataInventory'ye guvenmiyoruz (UpdatePlayerData bilinmeyen anahtari
--- kaydetmeyebiliyor -> nil okunup dongu hic durmuyordu).
-local CurrentTranscends = 0
-
-Network.Fired("Instancing_FireCustomFromServer"):Connect(function(
-    instanceID,
-    action,
-    CurrentLevel,
-    Rebirths,
-    CurrentKills,
-    OutOfTen,
-    BossTimerSeconds,
-    MaxLevel,
-    idk,
-    KillsRequired,
-    canRebirth,
-    unused12,
-    Transcends,
-    unused14
-)
-    if instanceID ~= "TapHeroes" then
+    if PriceData.IsPercentage and type(Percent) == "number" then
+        IsValidPrice = PriceData.AboveRAP and Percent >= tonumber("-" .. PriceData.RealPrice) or Percent >= PriceData.RealPrice
+    else
+        IsValidPrice = PriceData.RealPrice and PriceData.RealPrice - CurrentInfo.Cost >= 0
+    end
+    if Result == "Manipulated" then
         return
     end
 
-    if action == "TapHeroes_State" then
-        if BossTimerSeconds > 0 and LastBossTimer == 0 then
-            BossActive = true
-            LastLevel = CurrentLevel
-            LastBossChange = os.clock()
-            BossDespawnTime = os.clock() + BossTimerSeconds
+    if HasEnoughDiamonds and IsValidPrice and (not Data.MaxPrice or Data.MaxPrice >= CurrentInfo.Cost) then
+        local CanBuyCount = math.floor(GetDiamonds() / CurrentInfo.Cost)
+        local TrueBuyCount = math.min(CurrentInfo.Amount, CanBuyCount)
+        if Data.InventoryLimit then
+            TrueBuyCount = math.min(TrueBuyCount, Data.InventoryLimit - FindItem(CurrentInfo, true))
         end
-        if BossActive and BossTimerSeconds == 0 then
-            if os.clock() < BossDespawnTime then
-                BossActive = false
+        if Data.MaxAmount then
+            TrueBuyCount = math.min(TrueBuyCount, Data.MaxAmount)
+        end
+        if TrueBuyCount <= 0 then return end
+        warn("[Plaza Plus]: Sniping: x" .. TrueBuyCount .. " " .. CurrentInfo.Display .. ".")
+        HumanoidRootPart.CFrame = BoothsInteractive[Booth.BoothID]:WaitForChild("Interact", 7).CFrame * CFrame.new(0,-2, -6)
+        task.wait(0.5)
+
+        local Thing = {
+            ["Caller"] = {
+                ["LineNumber"] = 532,
+                ["ParameterCount"] = 2,
+                ["Variadic"] = false,
+                ["Traceback"] = "ReplicatedStorage.Library.Client.BoothCmds:532 function PromptPurchase2\nReplicatedStorage.Library.Client.BoothCmds:659 function promptOtherPlayerBooth2\nReplicatedStorage.Library.Client.BoothCmds:998",
+                ["ScriptPath"] = "ReplicatedStorage.Library.Client.BoothCmds",
+                ["ScriptClass"] = "ModuleScript",
+                ["Handle"] = "function: 0xc3ef3e0bb3f1ea43",
+                ["FunctionName"] = "PromptPurchase2",
+                ["ScriptType"] = "Instance",
+                ["SourceIdentifier"] = "ReplicatedStorage.Library.Client.BoothCmds"
+            }
+        }
+
+        local Success, Thing, Thing2, Thing3 = Library.Network.Invoke("Booths_RequestPurchase", Booth.PlayerID, {[CurrentInfo.UID] = TrueBuyCount}, Thing)
+        if Success then
+            CurrentInfo.Bought = TrueBuyCount
+            GlobalNotification(CurrentInfo, FindInfo, Percent)
+            if UI["URL"] then
+                SniperNotification(CurrentInfo, FindInfo, Percent)
             end
         end
-        LastBossTimer = BossTimerSeconds
+    end
+end
+local function ProcessBooth(Booth, Data)
+    for BoothInfo, InfoValues in next, Booth do
+        if BoothInfo ~= "Listings" then continue end
+        for ItemUID, ItemInfo in next, InfoValues do
+            local ItemData = ItemInfo.Item._data
+            local CurrentInfo = {
+                UID = ItemUID,
+                ID = ItemData.id,
+                Display = ItemData.id,
+                Class = ItemInfo.Item.Class.Name,
+                Rainbow = ItemInfo.Item.IsRainbow and ItemInfo.Item:IsRainbow(),
+                Golden = ItemInfo.Item.IsGolden and ItemInfo.Item:IsGolden(),
+                Shiny = ItemInfo.Item.IsShiny and ItemInfo.Item:IsShiny(),
 
-        local copy = table.clone(DataInventory.TapHeroes)
-        setreadonly(copy, false)
+                Amount = ItemData["_am"] or 1,
+                Tier = ItemData["tn"],
+                Cost = ItemInfo.DiamondCost,
+                RAP = (table.find({PS99.Normal, PS99.Pro}, game.PlaceId) and ItemInfo.Item.GetDevRAP and ItemInfo.Item:GetDevRAP()) or ItemInfo.Item.GetRAP and ItemInfo.Item:GetRAP(),
 
-        copy.MaxZone = MaxLevel
-        copy.CurrentZone = CurrentLevel
-        copy.Rebirths = Rebirths
-        copy.Transcends = Transcends
-        if type(Transcends) == "number" then
-            if Transcends ~= CurrentTranscends then
-                print("[TRANSCEND] " .. tostring(CurrentTranscends) .. " -> " .. tostring(Transcends)
-                    .. " | hedef: " .. tostring(Config["Max Rebirths"] or 0))
+                IsHuge = ItemInfo.Item.IsHuge and ItemInfo.Item:IsHuge() or false,
+                IsTitanic = ItemInfo.Item.IsTitanic and ItemInfo.Item:IsTitanic() or false,
+                IsExclusive = ItemInfo.Item.GetRarity and ItemInfo.Item:GetRarity()._id == "Exclusive",
+
+                Icon = ItemInfo.Item.GetIcon and ItemInfo.Item:GetIcon(),
+                Rarity = ItemInfo.Item.GetRarity and ItemInfo.Item:GetRarity()._id,
+            }
+            if CurrentInfo.Rainbow then
+                CurrentInfo.Display = "Rainbow "..CurrentInfo.Display
+            elseif CurrentInfo.Golden then
+                CurrentInfo.Display = "Golden "..CurrentInfo.Display
             end
-            CurrentTranscends = Transcends
+            if CurrentInfo.Shiny then
+                CurrentInfo.Display = "Shiny "..CurrentInfo.Display
+            end
+            if CurrentInfo.Tier then
+                CurrentInfo.Display = CurrentInfo.Display.." "..CurrentInfo.Tier
+            end
+            for Name, Data in next, Settings.Sniper.Items do
+                if Name == "SearchTerminal" then continue end
+                if not Data.FindInfo then
+                    FindInfo = GenerateFindInfo(Name, Data)
+                    Data.FindInfo = FindInfo
+                else
+                    FindInfo = Data.FindInfo
+                end
+                if ValidateItem(CurrentInfo, FindInfo) then
+                    ProcessItem(CurrentInfo, Data, Booth)
+                end
+            end
         end
-        if canRebirth then
-            print("you can now rebirth")
-            copy.canRebirth = canRebirth
-        end
-        UpdatePlayerData("TapHeroes",copy)
-        print(copy.MaxZone,copy.CurrentZone,copy.Rebirths,copy.canRebirth,canRebirth)
+    end
+end
 
-        RebirthsStat:Update(tostring(Rebirths or 0))
-        TranscendStat:Update(tostring(Transcends or 0))
-        LevelStat:Update(tostring(CurrentLevel or 0) .. "/" .. tostring(MaxLevel or 0))
-        StageProgressStat:Update(tostring(OutOfTen or 0) .. "/" .. tostring(KillsRequired or 0))
+local Servers = {}
+local function SearchTerminal(Class, Encoded, SearchQuery)
+    local FoundServer;
+    local Data = Encoded
+    pcall(function()
+        FoundServer = game.ReplicatedStorage.Network.TradingTerminal_Search:InvokeServer(Class, Data, nil, false) or nil
+    end)
+    if not FoundServer then
+        local IsGolden = SearchQuery.pt and SearchQuery.pt == 1 and "true" or "false"
+        local IsRainbow = SearchQuery.pt and SearchQuery.pt == 2 and "true" or "false"
+        local IsShiny = SearchQuery.sh and SearchQuery.sh and "true" or "false"
+        local HasTier = SearchQuery.tn and SearchQuery.tn and "true" or "false"
+        return warn("[Plaza Plus]: Incorrect Item Data! Cannot search for item: "..SearchQuery.id, "| Class: "..Class.." | IsRainbow: "..IsRainbow.." | IsGolden: "..IsGolden.." | IsShiny: "..IsShiny.." | Tier: "..HasTier)
+    end
+    if type(FoundServer) == "table" and FoundServer["place_id"] and FoundServer["job_id"] then
+        if (CanUsePro and table.find({PS99.Pro, PETSGO.Pro}, FoundServer["place_id"])) or (not UI["Only Pro"] and table.find({PS99.Normal, PETSGO.Normal}, FoundServer["place_id"])) then
+            table.insert(Servers, {["PlaceID"] = FoundServer["place_id"], ["JobID"] = FoundServer["job_id"]})
+        end
+    end
+end
+
+local function OrderedTable(tbl, order)
+    local encodedParts = {}
+
+    for _, key in ipairs(order) do
+        local value = tbl[key]
+        local formattedValue
+
+        if type(value) == "string" then
+            formattedValue = '"' .. value .. '"'
+        elseif type(value) == "boolean" or type(value) == "number" then
+            formattedValue = tostring(value)
+        end
+        if formattedValue ~= nil then
+            table.insert(encodedParts, '"' .. key .. '":' .. formattedValue)
+        end
+    end
+
+    return "{" .. table.concat(encodedParts, ",") .. "}"
+end
+
+local LimitCounts = 0
+local ReachedLimits = 0
+task.spawn(function()
+    if Settings.Sniper and Settings.Sniper.Active and FileSettings.Sniper then
+        for Name, Data in next, Settings.Sniper.Items do
+            if type(Name) ~= "string" or Name == "SearchTerminal" then continue end
+            warn("[Plaza Plus]: Searching for: "..Name..".")
+        end
+        if Settings.Sniper.Items.SearchTerminal then
+            for Name, Data in next, Settings.Sniper.Items.SearchTerminal do
+                if type(Name) ~= "string" then continue end
+                warn("[Plaza Plus]: Searching for: "..Name..".")
+            end
+        end
+    end
+    while task.wait() and Settings.Sniper and Settings.Sniper.Active and FileSettings.Sniper and Settings.Sniper.Items.SearchTerminal and UI["Switch Servers"] do
+        if Settings.Sniper.Items.SearchTerminal then
+            task.spawn(function()
+                for Name, Data in next, Settings.Sniper.Items.SearchTerminal do
+                    if type(Name) ~= "string" then continue end
+                    local FindInfo = GenerateFindInfo(Name, Data)
+                    if not FindInfo.Class then continue end
+                    --local SearchQuery = HttpService:JSONEncode({id = FindInfo.ID, pt = FindInfo.Golden and 1 or FindInfo.Rainbow and 2, sh = FindInfo.Shiny, tn = FindInfo.Tier})
+
+                    local searchTable = {
+                        id = FindInfo.ID,
+                        pt = FindInfo.Golden and 1 or FindInfo.Rainbow and 2,
+                        sh = FindInfo.Shiny,
+                        tn = FindInfo.Tier
+                    }
+
+                    local keyOrder = {"id", "pt", "sh", "tn"}
+                    local SearchQuery = OrderedTable(searchTable, keyOrder)
+
+                    SearchTerminal(FindInfo.Class, SearchQuery, HttpService:JSONDecode(SearchQuery))
+                    Settings.Sniper.Items[Name] = Settings.Sniper.Items[Name] or Data
+                end
+            end)
+        end
+        if UI["Limits Reached"] and LimitCounts == ReachedLimits and LimitCounts ~= 0 then
+            if UI["Switch To Selling"] and FileSettings.Sniper and Settings.Seller and Settings.Seller.Active then
+                FileSettings.Sniper = false
+                FileSettings.Seller = true
+            else
+                FileSettings.Sniper = false
+                return LocalPlayer:Kick("[Plaza Plus]: Limits Reached")
+            end
+        end
+        if UI["Diamonds Hit"] then
+            if GetDiamonds() <= UI["Diamonds Hit"] then
+                if UI["Switch To Selling"] and FileSettings.Sniper and Settings.Seller and Settings.Seller.Active then
+                    FileSettings.Sniper = false
+                    FileSettings.Seller = true
+                else
+                    FileSettings.Sniper = false
+                    return LocalPlayer:Kick("[Plaza Plus]: Diamonds Reached")
+                end
+            end
+        end
+        if UI["Minutes Timer"] then
+            if FileSettings.SniperTime then
+                if (os.time() - FileSettings.SniperTime) >= (UI["Minutes Timer"]) and (os.time() - FileSettings.SniperTime) <= 21600 then
+                    if UI["Switch To Selling"] and Settings.Seller and Settings.Seller.Active then
+                        FileSettings.Sniper = false
+                        FileSettings.Seller = true
+                        FileSettings.SniperTime = nil
+                    else
+                        FileSettings.SniperTime = nil
+                        FileSettings.Sniper = false
+                        return LocalPlayer:Kick("[Plaza Plus]: Timer Reached")
+                    end
+                elseif (os.time() - FileSettings.SniperTime) > 21600 then
+                    FileSettings.SniperTime = os.time()
+                end
+            else
+                FileSettings.SniperTime = os.time()
+            end
+        end
+        if not FileSettings.Sniper then
+            GrabIDs()
+            return Serverhop()
+        end
+        for Name, Data in next, Settings.Sniper.Items do
+            local FindInfo = GenerateFindInfo(Name, Data)
+            if not FindInfo.Class then continue end
+            if Data.InventoryLimit then
+                LimitCounts = LimitCounts + 1
+                if FindItem(FindInfo, true) >= tonumber(Data.InventoryLimit) then
+                    ReachedLimits = ReachedLimits + 1
+                end
+            end
+        end
+        task.wait(1)
     end
 end)
-
-
-Network.Invoke("Instancing_InvokeCustomFromClient","TapHeroes",MoveRemote)
-Network.Invoke("AutoTapper_Toggle")
-task.wait(1)
-Network.Invoke("Instancing_InvokeCustomFromClient","TapHeroes",MoveRemote)
-
-SetLevel()
-TeleportPlayer(Vector3.new(59988, 1007, 60601))
-
-
--- === TRANSCEND KILIDI + IZLEYICI ===
--- Hedefe ulasildiysa TranscendRemote giden HER istegi bloklar (kim cagirirsa cagirsin),
--- ayrica cagrildigi her seferde kimin cagirdigini (traceback) yazar.
--- Eger transcend olurken hicbir [TX-*] logu cikmiyorsa -> tetikleyen client degil,
--- sunucu tarafi otomatik (o zaman Max Area'yi dusurmek gerekir).
-do
-    pcall(function() if setreadonly then setreadonly(Network, false) end end)
-
-    local function hasTranscendArg(...)
-        for i = 1, select("#", ...) do
-            if (select(i, ...)) == TranscendRemote then return true end
-        end
-        return false
-    end
-
-    local function wrap(name)
-        local orig = Network[name]
-        if type(orig) ~= "function" then return end
-        pcall(function()
-            Network[name] = function(...)
-                if hasTranscendArg(...) then
-                    print("[TX-" .. name .. "] cagrildi | transcend=" .. tostring(CurrentTranscends)
-                        .. " hedef=" .. tostring(Config["Max Rebirths"] or 0))
-                    print(debug.traceback())
-                    if (CurrentTranscends or 0) >= (Config["Max Rebirths"] or 0) then
-                        print("[TX-" .. name .. "] >>> BLOKLANDI <<<")
-                        return
-                    end
+while task.wait() and Settings.Sniper and Settings.Sniper.Active and FileSettings.Sniper do
+    for _, Users in next, Booths do
+        for Username, Booth in next, Users do
+            CanContinue = false
+            pcall(function()
+                if Booth.Player and Booth.Player:IsInGroup(5060810) then
+                    CanContinue = true
                 end
-                return orig(...)
-            end
-        end)
+            end)
+            if CanContinue then continue end
+            ProcessBooth(Booth)
+        end
     end
-
-    wrap("Fire")
-    wrap("Invoke")
+    if UI["Switch Servers"] then
+        repeat task.wait() until (os.time() - StartingTime) >= UI["Teleport Delay"]
+        if #Servers >= 1 then
+            local RandomPlace = Servers[math.random(1, #Servers)]
+            if not FileSettings.Servers then
+                FileSettings.Servers = {}
+            end
+            if table.find(FileSettings.Servers, RandomPlace.JobID) then
+                continue
+            end
+            if #FileSettings.Servers >= 7 then
+                table.remove(FileSettings.Servers, table.find(FileSettings.Servers, FileSettings.Servers[1]))
+            end
+            table.insert(FileSettings.Servers, RandomPlace.JobID)
+            Save()
+            if FileSettings.Sniper then
+                TeleportService:TeleportToPlaceInstance(RandomPlace.PlaceID, RandomPlace.JobID, LocalPlayer)
+            end
+            task.wait(1.5)
+        else
+            if FileSettings.Sniper then
+                GrabIDs()
+                return Serverhop()
+            end
+        end
+    end
+    task.wait(1)
 end
 
-if (CurrentTranscends or 0) < (Config["Max Rebirths"] or 0) then
-    while (CurrentTranscends or 0) < (Config["Max Rebirths"] or 0) do
+local LastUIDDs = {}
+if Settings.Seller and Settings.Seller.Active and FileSettings.Seller then
+    local function IsBoothAvailable(BoothID)
+        for _, BoothTable in pairs(ClaimedBooths) do
+            if BoothTable.BoothID == BoothID then
+                return false
+            end
+        end
+        return true
+    end
+    local function GetCenterX()
+        local minX, maxX = math.huge, -math.huge
+        for _, BoothModel in pairs(BoothsInteractive) do
+            local boothX = BoothModel.Pets.Position.X
+            if boothX < minX then
+                minX = boothX
+            end
+            if boothX > maxX then
+                maxX = boothX
+            end
+        end
+        return (minX + maxX) / 2
+    end
+    local function GetBoothPriority(BoothModel, CenterX)
+        local yPriority = BoothModel.Pets.Position.Y
+        local xDistance = math.abs(BoothModel.Pets.Position.X - CenterX)
+        return yPriority, xDistance
+    end
+    local function ClaimOptimalBooth()
+        local BoothCandidates = {}
+        local CenterX = GetCenterX()
+        for BoothID, BoothModel in next, BoothsInteractive do
+            if ClaimedBooths[LocalPlayer] then
+                return
+            end
+            if IsBoothAvailable(BoothID) then
+                local yPriority, xDistance = GetBoothPriority(BoothModel, CenterX)
+                table.insert(BoothCandidates, {
+                    BoothID = BoothID,
+                    Model = BoothModel,
+                    Y = yPriority,
+                    xDistance = xDistance
+                })
+            end
+        end
+        table.sort(BoothCandidates, function(a, b)
+            if a.Y == b.Y then
+                return a.xDistance < b.xDistance
+            end
+            return a.Y < b.Y
+        end)
+        for _, Booth in next, BoothCandidates do
+            local Success, Result = Library.Network.Invoke("Booths_ClaimBooth", Booth.BoothID)
+            if Success then
+                local Interact = Booth.Model:WaitForChild("Interact", 7)
+                if Interact then
+                    Library.Network.Fire("Hoverboard_RequestUnequip")
+                    task.wait(1)
+                    HumanoidRootPart.CFrame = Interact.CFrame * CFrame.new(0,-2, -6) * CFrame.Angles(0,math.rad(180),0)
+                end
+                return true
+            end
+        end
+    end
 
-        repeat
-            SetLevel(DataInventory.TapHeroes.MaxZone or 1)
-            local currentZone = DataInventory.TapHeroes.CurrentZone or 1
-            if currentZone % 5 == 0 then
-                
-                local LastHealth = nil
-                local LastTime = os.clock()
-                local CurrentDPS = 0
+    ClaimOptimalBooth()
+    repeat task.wait() until ClaimedBooths[LocalPlayer]
+    warn("[Plaza Plus]: Booth was claimed, listing items...")
 
-                local BossDespawnTime2 = BossDespawnTime 
-                while BossActive and os.clock() < BossDespawnTime2 do
-                    HatchNearest()
-                    SetLevel(DataInventory.TapHeroes.MaxZone or 1)
-                    task.wait()
-                
-                    local data_source = instanceBreakables[InstancingCmds.instanceId] or {}
-                    for _, breakdata in pairs(data_source) do
-                        local pos = breakdata.Position or breakdata.position or breakdata.pos
-                    
-                        if pos then
-                            local dist = (HumanoidRootPartPosition - pos).Magnitude
-                            if dist <= 100 then
-                                local health = breakdata.health or 0
-                                local maxHealth = breakdata.maxHealth or health
-                            
-                                if LastHealth and health < LastHealth then
-                                    local deltaHealth = LastHealth - health
-                                    local deltaTime = os.clock() - LastTime
-                                    if deltaTime > 0 then
-                                        CurrentDPS = deltaHealth / deltaTime
-                                    end
-                                end
-                            
-                                LastHealth = health
-                                LastTime = os.clock()
-                            
-                                local timeLeft = BossDespawnTime2 - os.clock()
-                                local timeNeeded = CurrentDPS > 0 and (health / CurrentDPS) or math.huge
-                                local canKill = timeNeeded <= timeLeft
-                            
-                                StatusUpdate(
-                                    "Boss Chest: " .. utils:FormatNumber(health) .. "/" .. utils:FormatNumber(maxHealth) ..
-                                    " | DPS: " .. utils:FormatNumber(CurrentDPS) ..
-                                    " | Need: " .. (timeNeeded == math.huge and "∞" or math.floor(timeNeeded) .. "s") ..
-                                    " | " .. (canKill and "CAN DESTROY" or "TOO SLOW")
-                                )
+    Library.Network.Fired("Booths: Add History"):Connect(function(Info)
+    --ReplicatedStorage.Network["Booths: Add History"].OnClientEvent:Connect(function(Info)
+        local ItemCost = 0
+        for Class, ClassTable in next, Info["Received"] do
+            for UID, Items in ClassTable do
+                if (Items._am or 1) > ItemCost then
+                    ItemCost = Items._am or 1
+                end
+            end
+        end
+        for Class, ClassTable in next, Info["Given"] do
+            for UID, Items in ClassTable do
+                warn("[Plaza Plus]: "..Items.id.." ("..UID..") was sold!")
+                if UI["URL"] and not table.find(LastUIDDs, UID) then
+                    table.insert(LastUIDDs, UID)
+
+                    local ItemData = ItemList[Class] and ItemList[Class][Items.id]
+                    if not ItemData and ItemList[Class] then
+                        for _,v in next, ItemList[Class] do
+                            if v.ID == Items.id then
+                                ItemData = v
+                                break
                             end
                         end
                     end
-                end
-
-                if os.clock() >= BossDespawnTime2 then
-                    BossActive = false
-                    
-                    local maxZone = DataInventory.TapHeroes.MaxZone or 10
-
-                    Network.Invoke("Instancing_InvokeCustomFromClient", "TapHeroes", SetLevelRemote, math.max(1, maxZone - 5))
-                    local StartTimer = os.clock()
-
-                    repeat
-                        task.wait(0.1)
-                        HatchNearest()
-                    
-                        local remaining = math.max(0, 30 - math.floor(os.clock() - StartTimer))
-                        StatusUpdate("Failed Defeating the boss retrying in: " .. remaining .. "s")
-                    until os.clock() - StartTimer > 30
-
-                    SetLevel(DataInventory.TapHeroes.MaxZone or 1)
-                else
-                    SetLevel(DataInventory.TapHeroes.MaxZone or 1)
+                    if ItemData then
+                        task.wait(1)
+                        -- Variant'li satislarda (Shiny/Rainbow/Golden) ismin onune ek koy.
+                        -- _data alanlari: sh = shiny, pt = 1 (golden) / 2 (rainbow) - bkz. SearchTerminal.
+                        local DisplayName = ItemData.Display
+                        local Prefix = ""
+                        if Items.sh then Prefix = "Shiny" end
+                        if Items.pt == 2 then
+                            Prefix = (Prefix ~= "" and Prefix .. " " or "") .. "Rainbow"
+                        elseif Items.pt == 1 then
+                            Prefix = (Prefix ~= "" and Prefix .. " " or "") .. "Golden"
+                        end
+                        if Prefix ~= "" then
+                            DisplayName = Prefix .. " " .. DisplayName
+                        end
+                        -- Variant ikonu: item'i yeniden kurup variant'i uygula, :GetIcon() al.
+                        -- Hata olursa Icon temel ikona (ItemData.Icon) duser; webhook bozulmaz.
+                        local Icon = ItemData.Icon
+                        pcall(function()
+                            local Ctor = Library.Items and Library.Items.Types and Library.Items.Types[Class]
+                            if not Ctor or not ItemData.ID then return end
+                            local NewItem = Ctor(ItemData.ID)
+                            if Items.sh then NewItem:SetShiny(true) end
+                            if Items.pt == 2 then
+                                NewItem:SetRainbow()
+                            elseif Items.pt == 1 then
+                                NewItem:SetGolden()
+                            end
+                            if Items.tn then NewItem:SetTier(Items.tn) end
+                            local NewIcon = NewItem.GetIcon and NewItem:GetIcon()
+                            if NewIcon then Icon = NewIcon end
+                        end)
+                        print(Items._am or 1, ItemCost, Items.id, Icon, DisplayName, Class, "| sh:", Items.sh, "pt:", Items.pt)
+                        return SellerNotification({Amount = Items._am or 1, Spent = ItemCost, ID = Items.id, Icon = Icon, Name = DisplayName, Class = Class})
+                    end
                 end
             end
-            
-            task.wait(0.1)
-            HatchNearest()
-            
-            if (DataInventory.TapHeroes.MaxZone or 1) >= 120 then
-                print(tostring(DataInventory.TapHeroes.canRebirth))
-            end
-        until ((DataInventory.TapHeroes.MaxZone or 1) >= 120 and DataInventory.TapHeroes.canRebirth)
-            or (CurrentTranscends or 0) >= (Config["Max Rebirths"] or 0)
-
-        -- Hedefe grind sirasinda ulastiysak hic ateslemeden cik
-        if (CurrentTranscends or 0) >= (Config["Max Rebirths"] or 0) then
-            break
         end
+    end)
 
-        local TargetRebirth = (DataInventory.TapHeroes.Rebirths or 0) + 1
-        StatusUpdate("Transcend/Rebirth aksiyonu -> hedef rebirth: " .. tostring(TargetRebirth)
-            .. " | Transcend: " .. tostring(CurrentTranscends or 0)
-            .. "/" .. tostring(Config["Max Rebirths"] or 0))
-        repeat
-            -- Hedefe ulastiysak fazladan atma
-            if (CurrentTranscends or 0) >= (Config["Max Rebirths"] or 0) then
+
+    local function ProcessItem(Name, Data)
+        local FindInfo = GenerateFindInfo(Name, Data)
+        local UsedSlots = FindItemsInBooth()
+        local MaxSlots = (table.find({PS99.Normal, PS99.Pro}, game.PlaceId) and PlayerSave.Get().BoothSlots) or (4 + UpgradeCmds.GetPower("BiggerBooth"))
+
+        repeat task.wait()
+            if UsedSlots >= MaxSlots then break end
+
+            local UID, ItemData = FindItem(FindInfo)
+            Amount = ItemData and ItemData.Amount or 1
+            --[[if ItemData.IsExclusive and ItemData.Amount == 1 then
+                ItemData.Amount = FindItem(FindInfo, true)
+            end]]--
+            if not UID then
                 break
             end
-            -- Eski rebirth stilinde direkt remote (dump'ta TX_Post olarak tespit edildi).
-            Network.Fire("Instancing_FireCustomFromClient","TapHeroes",TranscendRemote)
-            task.wait(0.5)
-        until (DataInventory.TapHeroes.Rebirths or 0) >= TargetRebirth
-    end
-end
 
-print(DataInventory.TapHeroes.MaxZone or 1,Config["Max Area"])
-if (DataInventory.TapHeroes.MaxZone or 1) <  (Config["Max Area"] or 0) then
-    while (DataInventory.TapHeroes.MaxZone or 1) <  (Config["Max Area"] or 0) do
-        SetLevel(DataInventory.TapHeroes.MaxZone or 1, false)
-        local currentZone = DataInventory.TapHeroes.CurrentZone or 1
-        if currentZone % 5 == 0 then
-            local LastHealth = nil
-            local LastTime = os.clock()
-            local CurrentDPS = 0
+            local PriceData = {
+                IsPercentage = type(Data.Price) == "string" and Data.Price:find("%%"),
+                AboveRAP = type(Data.Price) == "string" and Data.Price:find("+"),
+                NegativePrice = (type(Data.Price) == "number" and Data.Price < 0) or (type(Data.Price) == "string" and Data.Price:find("^%-")),
+                MaxPrice = Data.MaxPrice and ((type(Data.MaxPrice) == "number" and Data.MaxPrice) or (type(Data.MaxPrice) == "string" and RemoveSuffix(Data.MaxPrice))) or nil,
+                MinPrice = Data.MinPrice and ((type(Data.MinPrice) == "number" and Data.MinPrice) or (type(Data.MinPrice) == "string" and RemoveSuffix(Data.MinPrice))) or nil,
+            }
+            PriceData.RealPrice = tonumber(type(Data.Price) == "string" and (not PriceData.IsPercentage and RemoveSuffix(Data.Price) or Data.Price:gsub("%D", "")) or Data.Price)
+            if PriceData.IsPercentage or PriceData.AboveRAP or PriceData.NegativePrice then
+                local NewItem = Library.Items.Types[ItemData.Class](ItemData.ID)
+                if ItemData.Golden then NewItem:SetGolden() end
+                if ItemData.Rainbow then NewItem:SetRainbow() end
+                if ItemData.Shiny then NewItem:SetShiny(true) end
+                if ItemData.Color then NewItem:SetColorVariant(ItemData.Color) end
+                if ItemData.Tier then NewItem:SetTier(ItemData.Tier) end
 
-            local BossDespawnTime2 = BossDespawnTime 
-            while BossActive and os.clock() < BossDespawnTime2 do
-                HatchNearest()
-                task.wait()
-                SetLevel(DataInventory.TapHeroes.MaxZone or 1)
-                local data_source = instanceBreakables[InstancingCmds.instanceId] or {}
-                for _, breakdata in pairs(data_source) do
-                    local pos = breakdata.Position or breakdata.position or breakdata.pos
-                
-                    if pos then
-                        local dist = (HumanoidRootPartPosition - pos).Magnitude
-                        if dist <= 100 then
-                            local health = breakdata.health or 0
-                            local maxHealth = breakdata.maxHealth or health
-                        
-                            if LastHealth and health < LastHealth then
-                                local deltaHealth = LastHealth - health
-                                local deltaTime = os.clock() - LastTime
-                                if deltaTime > 0 then
-                                    CurrentDPS = deltaHealth / deltaTime
-                                end
-                            end
-                        
-                            LastHealth = health
-                            LastTime = os.clock()
-                        
-                            local timeLeft = BossDespawnTime2 - os.clock()
-                            local timeNeeded = CurrentDPS > 0 and (health / CurrentDPS) or math.huge
-                            local canKill = timeNeeded <= timeLeft
-                        
-                            StatusUpdate(
-                                "Boss Chest: " .. utils:FormatNumber(health) .. "/" .. utils:FormatNumber(maxHealth) ..
-                                " | DPS: " .. utils:FormatNumber(CurrentDPS) ..
-                                " | Need: " .. (timeNeeded == math.huge and "∞" or math.floor(timeNeeded) .. "s") ..
-                                " | " .. (canKill and "CAN DESTROY" or "TOO SLOW")
-                            )
+                RAP = (table.find({PS99.Normal, PS99.Pro}, game.PlaceId) and NewItem.GetDevRAP and NewItem:GetDevRAP()) or NewItem.GetRAP and NewItem:GetRAP()
+                if not RAP then
+                    table.insert(BlacklistedUIDs, UID)
+                    continue
+                end
+
+
+                if Data and Data.DetectManipulation then
+                    local Result;
+                    local ManipulationData = FileSettings.DetectManipulation or {Time = os.time()}
+                    local ManipulatedInfo = ManipulationData[ItemData.Display]
+                    if ManipulatedInfo and ManipulatedInfo.RAP == RAP then
+                        Result = ManipulatedInfo.Result
+                        TempRAP[ItemData.Display] = Result
+                    else
+                        pcall(function()
+                            RAPData = HttpService:JSONDecode(game:HttpGet("https://ps99rap.com/api/get/rap?id=" .. ItemData.Display:lower():gsub(" ", "%%20"))).data
+                        end)
+                        if RAPData then
+                            Result = DetermineTrend(RAPData)
+                            TempRAP[ItemData.Display] = Result
+                            ManipulationData[ItemData.Display] = {Result = Result, RAP = RAP}
                         end
+                    end
+                    if os.time() - ManipulationData.Time >= 7200 then
+                        ManipulationData.Time = os.time()
+                    end
+                    FileSettings.DetectManipulation = ManipulationData
+                    Save()
+                    if Result == "Manipulated" then
+                        warn(Result)
+                        table.insert(BlacklistedUIDs, UID)
+                        continue
+                    end
+                end
+
+
+
+                if PriceData.NegativePrice then
+                    PriceData.RealPrice = RAP + PriceData.RealPrice
+                end
+                if PriceData.IsPercentage or PriceData.AboveRAP then
+                    if PriceData.AboveRAP then
+                        PriceData.RealPrice = RAP + (RAP * (PriceData.RealPrice / 100))
+                    else
+                        PriceData.RealPrice = RAP - (RAP * (PriceData.RealPrice / 100))
                     end
                 end
             end
-                
-            if os.clock() >= BossDespawnTime2 then
-                BossActive = false
-                
-                local maxZone = DataInventory.TapHeroes.MaxZone or 10
-                Network.Invoke("Instancing_InvokeCustomFromClient", "TapHeroes", SetLevelRemote, math.max(1, maxZone - 5))
-                local StartTimer = os.clock()
-                repeat
-                    task.wait(0.1)
-                    HatchNearest()
-                
-                    local remaining = math.max(0, 30 - math.floor(os.clock() - StartTimer))
-                    StatusUpdate("Failed Defeating the boss retrying in: " .. remaining .. "s")
-                until os.clock() - StartTimer > 30
+            if PriceData.MinPrice and PriceData.RealPrice < PriceData.MinPrice then
+                PriceData.RealPrice = PriceData.MinPrice
+            end
+            if PriceData.MaxPrice and PriceData.RealPrice > PriceData.MaxPrice then
+                PriceData.RealPrice = PriceData.MaxPrice
+            end
+            Amount = ((Data.Amount and Data.Amount > Amount) and Amount or Data.Amount) or Amount
+            if PriceData.RealPrice * Amount >= RemoveSuffix("100b") then
+                Amount = math.floor(RemoveSuffix("100b") / PriceData.RealPrice)
+            end
+            local BoothSlots, ItemSlots = FindItemsInBooth(FindInfo.ID, FindInfo.Class)
+            if Data.Amount and ItemSlots and ItemSlots >= Data.Amount then
+                return
+            end
+            if PriceData.RealPrice <= 0 or not PriceData.RealPrice then
+                return print("[Plaza Plus]: ERROR LISTING ITEM: ".. ItemData.ID, "("..ItemData.Class..") for price: "..tostring(PriceData.RealPrice))
+            end
+            local MaxAmount = table.find({PS99.Normal, PS99.Pro}, game.PlaceId) and 50000 or 5000
+            print("Attempting to list: ".. ItemData.ID, "("..ItemData.Class..") for price: "..tostring(PriceData.RealPrice))
+            task.wait(math.random(3,9))
+            local yessir = 0
+            if ItemSlots and ItemSlots >= 1 and Amount ~= 1 then
+                Amount = math.max(0, Amount - ItemSlots)
+                if Amount <= 0 then
+                    print("yes")
+                    break
+                end
+            end
+            while Amount > 0 and UsedSlots < MaxSlots do
+                local SellTimer = os.time()
+                local Success = Library.Network.Invoke("Booths_CreateListing", UID, math.floor(PriceData.RealPrice), math.min(Amount, MaxAmount))
+                repeat task.wait() until Success or (os.time() - SellTimer) >= 10
+                UsedSlots = FindItemsInBooth()
+                if Success then
+                    warn("[Plaza Plus]: Added item:", ItemData.ID, "x" .. math.min(Amount, MaxAmount))
+                    Amount = Amount - MaxAmount
+                else
+                    yessir = yessir + 1
+                    table.remove(LastUIDs, table.find(LastUIDs, UID))
+                    warn("[Plaza Plus]: FAILED to add item:", ItemData.ID, "x" .. math.min(Amount, MaxAmount))
+                end
+                if yessir >= 3 then
+                    break
+                end
+            end
+        until UsedSlots >= MaxSlots
+    end
 
-                SetLevel(DataInventory.TapHeroes.MaxZone or 1, false)
+    task.spawn(function()
+        local Keys = {}
+        local PriorityKeys = {}
+        local NonPriorityKeys = {}
+        for i, Data in pairs(Settings.Seller.Items) do
+            if Data.Priority then
+                table.insert(PriorityKeys, i)
             else
-                SetLevel(DataInventory.TapHeroes.MaxZone or 1, false)
+                table.insert(NonPriorityKeys, i)
             end
         end
-        
-        task.wait(0.1)
-        HatchNearest()
-    end
-end
-
-StatusUpdate("Reached Target")
-
-if Config["FarmChests"] then
-    while task.wait(0.1) do
-        HatchNearest()
-        for i,level in ipairs(Config["FarmChests"]) do
-            SetLevel(level)
-            task.wait(0.1)
+        for _, k in ipairs(PriorityKeys) do
+            table.insert(Keys, k)
         end
-    end
-end
-
-while task.wait(0.1) do
-    HatchNearest()
-    local currentZone = DataInventory.TapHeroes.CurrentZone or 1
-    if currentZone % 5 == 0 then
-        local LastHealth = nil
-        local LastTime = os.clock()
-        local CurrentDPS = 0
-
-        local BossDespawnTime2 = BossDespawnTime 
-        while BossActive and os.clock() < BossDespawnTime2 do
-            HatchNearest()
-            task.wait()
-        
-            local data_source = instanceBreakables[InstancingCmds.instanceId] or {}
-            for _, breakdata in pairs(data_source) do
-                local pos = breakdata.Position or breakdata.position or breakdata.pos
-            
-                if pos then
-                    local dist = (HumanoidRootPartPosition - pos).Magnitude
-                    if dist <= 100 then
-                        local health = breakdata.health or 0
-                        local maxHealth = breakdata.maxHealth or health
-                    
-                        if LastHealth and health < LastHealth then
-                            local deltaHealth = LastHealth - health
-                            local deltaTime = os.clock() - LastTime
-                            if deltaTime > 0 then
-                                CurrentDPS = deltaHealth / deltaTime
-                            end
-                        end
-                    
-                        LastHealth = health
-                        LastTime = os.clock()
-                    
-                        local timeLeft = BossDespawnTime - os.clock()
-                        local timeNeeded = CurrentDPS > 0 and (health / CurrentDPS) or math.huge
-                        local canKill = timeNeeded <= timeLeft
-                    
-                        StatusUpdate("Boss Chest: " .. utils:FormatNumber(health) .. "/" .. utils:FormatNumber(maxHealth))
+        for _, k in ipairs(NonPriorityKeys) do
+            table.insert(Keys, k)
+        end
+        while task.wait() and Settings.Seller.Active do
+            for _, Name in ipairs(Keys) do
+                local Data = Settings.Seller.Items[Name]
+                ProcessItem(Name, Data)
+            end
+            if UI["Booth Runout"] then
+                local BoothCount = FindItemsInBooth()
+                if BoothCount == 0 then
+                    task.wait(3)
+                    BoothCount = FindItemsInBooth()
+                    if BoothCount ~= 0 then continue end
+                    if UI["Switch To Sniping"] and Settings.Sniper and Settings.Sniper.Active then
+                        FileSettings.Sniper = true
+                        FileSettings.Seller = false
+                    else
+                        FileSettings.Seller = false
+                        return LocalPlayer:Kick("[Plaza Plus]: Booth Runout")
                     end
                 end
             end
+            if UI["Diamonds Hit"] and GetDiamonds() >= UI["Diamonds Hit"] then
+                task.wait(3)
+                if UI["Switch To Sniping"] and Settings.Sniper and Settings.Sniper.Active then
+                    FileSettings.Sniper = true
+                    FileSettings.Seller = false
+                else
+                    FileSettings.Seller = false
+                    return LocalPlayer:Kick("[Plaza Plus]: Diamonds Reached")
+                end
+            end
+            if UI["Minutes Timer"] then
+                if FileSettings.SellerTime then
+                    if (os.time() - FileSettings.SellerTime) >= UI["Minutes Timer"] and (os.time() - FileSettings.SellerTime) <= 21600 then
+                        if UI["Switch To Sniping"] and Settings.Sniper and Settings.Sniper.Active then
+                            FileSettings.Sniper = true
+                            FileSettings.Seller = false
+                            FileSettings.SellerTime = nil
+                        else
+                            FileSettings.Seller = false
+                            FileSettings.SellerTime = nil
+                            return LocalPlayer:Kick("[Plaza Plus]: Timer Reached1")
+                        end
+                    elseif (os.time() - FileSettings.SellerTime) > 21600 then
+                        FileSettings.SellerTime = os.time()
+                    end
+                else
+                    FileSettings.SellerTime = os.time()
+                end
+            end
+            if (UI["Switch Servers"] and UI["Teleport Delay"] and (os.time() - StartingTime) >= UI["Teleport Delay"]) or not FileSettings.Seller then
+                GrabIDs()
+                return Serverhop(true)
+            end
         end
-            
-        if os.clock() >= BossDespawnTime2 then
-            BossActive = false
-            
-            local maxZone = currentZone or 10
-            Network.Invoke("Instancing_InvokeCustomFromClient", "TapHeroes", SetLevelRemote, math.max(1, maxZone - 5))
-            local StartTimer = os.clock()
-            repeat
-                task.wait(0.1)
-                HatchNearest()
-            
-                local remaining = math.max(0, 30 - math.floor(os.clock() - StartTimer))
-                StatusUpdate("Failed Defeating the boss retrying in: " .. remaining .. "s")
-            until os.clock() - StartTimer > 30
-            SetLevel(currentZone or 1, false)
-        else
-            SetLevel(currentZone or 1, false)
-        end
-    end
-    SetLevel(Config["Max Area"])
-    StatusUpdate("Reached Target Hatching now")
+    end)
 end
