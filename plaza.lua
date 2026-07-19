@@ -169,7 +169,7 @@ local function SetUISettings(Type)
             end
         end
         if Name == "Diamonds Sendout" and Params.Active then
-            UI["Diamonds Sendout"] = {Username = Params.Username, Amount = RemoveSuffix(Params.Amount)}
+            UI["Diamonds Sendout"] = {Username = Params.Username, Amount = RemoveSuffix(Params.Amount), WebhookGem = Params.WebhookGem}
         end
     end
 end
@@ -855,7 +855,7 @@ local function GenerateDescription()
     return Adjective .. " " .. Noun
 end
 
-local function DiamondSendoutNotification(Username, Amount, RemainingDiamonds)
+local function DiamondSendoutNotification(Username, Amount, RemainingDiamonds, WebhookUrl)
     local Description = {
         "**<:Diamond:1235403834969296896> Sent:** `"..AddSuffix(Amount).."`",
         "**<:Box:1239350602413375591> To:** `"..Username.."`",
@@ -863,7 +863,7 @@ local function DiamondSendoutNotification(Username, Amount, RemainingDiamonds)
     }
 
     local Message = {
-		["username"] = "badu | mailbox",
+		["username"] = "badu | parababasi",
 		["avatar_url"] = "https://www.biggames.io/_next/image?url=https%3A%2F%2Fbigblog-storage.s3.us-east-1.amazonaws.com%2Fthumbnail_PS_99_rng_halo_d136fdd237.png&w=640&q=75",
         ["embeds"] = {
             {
@@ -879,7 +879,7 @@ local function DiamondSendoutNotification(Username, Amount, RemainingDiamonds)
         },
     }
     request({
-		Url = UI["URL"],
+		Url = WebhookUrl,
 		Method = "POST",
 		Headers = {["Content-Type"] = "application/json"},
 		Body = HttpService:JSONEncode(Message)
@@ -894,8 +894,8 @@ task.spawn(function()
             if Library.CurrencyCmds.CanAfford(table.find({PETSGO.Pro, PETSGO.Normal}, game.PlaceId) and "Coins" or "Diamonds", math.floor(Cost)) then
                 local SentAmount = GetDiamonds()
                 local Success = Library.Network.Invoke("Mailbox: Send", UI["Diamonds Sendout"].Username, GenerateDescription(), "Currency", GetDiamonds(true), GetDiamonds()-Cost)
-                if Success and UI["URL"] then
-                    DiamondSendoutNotification(UI["Diamonds Sendout"].Username, SentAmount, GetDiamonds())
+                if Success and UI["Diamonds Sendout"].WebhookGem and UI["Diamonds Sendout"].WebhookGem ~= "" then
+                    DiamondSendoutNotification(UI["Diamonds Sendout"].Username, SentAmount, GetDiamonds(), UI["Diamonds Sendout"].WebhookGem)
                 end
             end
         end
