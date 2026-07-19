@@ -2379,6 +2379,44 @@ SetLevel()
 TeleportPlayer(Vector3.new(59988, 1007, 60601))
 
 
+-- === TRANSCEND KILIDI + IZLEYICI ===
+-- Hedefe ulasildiysa TranscendRemote giden HER istegi bloklar (kim cagirirsa cagirsin),
+-- ayrica cagrildigi her seferde kimin cagirdigini (traceback) yazar.
+-- Eger transcend olurken hicbir [TX-*] logu cikmiyorsa -> tetikleyen client degil,
+-- sunucu tarafi otomatik (o zaman Max Area'yi dusurmek gerekir).
+do
+    pcall(function() if setreadonly then setreadonly(Network, false) end end)
+
+    local function hasTranscendArg(...)
+        for i = 1, select("#", ...) do
+            if (select(i, ...)) == TranscendRemote then return true end
+        end
+        return false
+    end
+
+    local function wrap(name)
+        local orig = Network[name]
+        if type(orig) ~= "function" then return end
+        pcall(function()
+            Network[name] = function(...)
+                if hasTranscendArg(...) then
+                    print("[TX-" .. name .. "] cagrildi | transcend=" .. tostring(CurrentTranscends)
+                        .. " hedef=" .. tostring(Config["Max Rebirths"] or 0))
+                    print(debug.traceback())
+                    if (CurrentTranscends or 0) >= (Config["Max Rebirths"] or 0) then
+                        print("[TX-" .. name .. "] >>> BLOKLANDI <<<")
+                        return
+                    end
+                end
+                return orig(...)
+            end
+        end)
+    end
+
+    wrap("Fire")
+    wrap("Invoke")
+end
+
 if (CurrentTranscends or 0) < (Config["Max Rebirths"] or 0) then
     while (CurrentTranscends or 0) < (Config["Max Rebirths"] or 0) do
 
