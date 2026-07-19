@@ -975,7 +975,7 @@ local function SellerNotification(CurrentInfo)
         "**<:Booth:1239350605294604378> Booth Count:** `"..AddCommas(ItemCount).."`",
         "**<:Bank:1295944894698754102> Current Diamonds:** `"..AddSuffix(GetDiamonds()).."`",
         "**<:Misc:1236020543082463253> Total Huges:** `"..AddCommas(GetTotalHuges()).."`",
-        "**<:Misc:1236020543082463253> Total Gifts:** `"..AddCommas(GetItemAmount("Marble Gift")).."`",
+        "**<:Misc:1236020543082463253> Total Gifts:** `"..AddCommas(GetItemAmount("Obsidian Gift")).."`",
         "**<:Misc:1236020543082463253> Total Mini Pinata:** `"..AddCommas(GetItemAmount("Mini Pinata")).."`",
         "**<:Misc:1236020543082463253> Total Rainbow Mini Chest:** `"..AddCommas(GetItemAmount("Rainbow Mini Chest")).."`",
         "**<:Misc:1236020543082463253> Keys:** `C:"..AddCommas(GetItemAmount("Crystal Key")).." S:"..AddCommas(GetItemAmount("Secret Key")).." T:"..AddCommas(GetItemAmount("Tech Key")).." V:"..AddCommas(GetItemAmount("Void Key")).."`",
