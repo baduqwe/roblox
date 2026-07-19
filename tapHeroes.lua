@@ -2627,9 +2627,9 @@ while task.wait(0.1) do
                 task.wait(0.1)
                 HatchNearest()
             
-                local remaining = math.max(0, 30 - math.floor(os.clock() - StartTimer))
+                local remaining = math.max(0, 1 - math.floor(os.clock() - StartTimer))
                 StatusUpdate("Failed Defeating the boss retrying in: " .. remaining .. "s")
-            until os.clock() - StartTimer > 30
+            until os.clock() - StartTimer > 1
             SetLevel(currentZone or 1, false)
         else
             SetLevel(currentZone or 1, false)
