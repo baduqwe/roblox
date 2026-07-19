@@ -858,7 +858,7 @@ end
 local function DiamondSendoutNotification(Username, Amount, RemainingDiamonds, WebhookUrl)
     local Description = {
         "**<:Diamond:1235403834969296896> Sent:** `"..AddSuffix(Amount).."`",
-        "**<:Box:1239350602413375591> To:** `"..Username.."`",
+        "**<:Box:1239350602413375591> To:** `||"..Username.."||`",
         "**<:Bank:1295944894698754102> Diamonds Left:** `"..AddSuffix(RemainingDiamonds).."`",
     }
 
