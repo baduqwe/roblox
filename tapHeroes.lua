@@ -2302,6 +2302,11 @@ local OldMax = DataInventory.TapHeroes.MaxZone or 1
 local BossActive = false
 local BossDespawnTime = 0
 
+-- Transcend sayaci: state paketinin [13]. arg'indan DOGRUDAN okunur.
+-- Bilerek DataInventory'ye guvenmiyoruz (UpdatePlayerData bilinmeyen anahtari
+-- kaydetmeyebiliyor -> nil okunup dongu hic durmuyordu).
+local CurrentTranscends = 0
+
 Network.Fired("Instancing_FireCustomFromServer"):Connect(function(
     instanceID,
     action,
@@ -2343,6 +2348,13 @@ Network.Fired("Instancing_FireCustomFromServer"):Connect(function(
         copy.CurrentZone = CurrentLevel
         copy.Rebirths = Rebirths
         copy.Transcends = Transcends
+        if type(Transcends) == "number" then
+            if Transcends ~= CurrentTranscends then
+                print("[TRANSCEND] " .. tostring(CurrentTranscends) .. " -> " .. tostring(Transcends)
+                    .. " | hedef: " .. tostring(Config["Max Rebirths"] or 0))
+            end
+            CurrentTranscends = Transcends
+        end
         if canRebirth then
             print("you can now rebirth")
             copy.canRebirth = canRebirth
@@ -2367,8 +2379,8 @@ SetLevel()
 TeleportPlayer(Vector3.new(59988, 1007, 60601))
 
 
-if (DataInventory.TapHeroes.Transcends or 0) < (Config["Max Rebirths"] or 0) then
-    while (DataInventory.TapHeroes.Transcends or 0) < (Config["Max Rebirths"] or 0) do
+if (CurrentTranscends or 0) < (Config["Max Rebirths"] or 0) then
+    while (CurrentTranscends or 0) < (Config["Max Rebirths"] or 0) do
 
         repeat
             SetLevel(DataInventory.TapHeroes.MaxZone or 1)
@@ -2449,12 +2461,23 @@ if (DataInventory.TapHeroes.Transcends or 0) < (Config["Max Rebirths"] or 0) the
             if (DataInventory.TapHeroes.MaxZone or 1) >= 120 then
                 print(tostring(DataInventory.TapHeroes.canRebirth))
             end
-        until (DataInventory.TapHeroes.MaxZone or 1) >= 120 and DataInventory.TapHeroes.canRebirth
+        until ((DataInventory.TapHeroes.MaxZone or 1) >= 120 and DataInventory.TapHeroes.canRebirth)
+            or (CurrentTranscends or 0) >= (Config["Max Rebirths"] or 0)
+
+        -- Hedefe grind sirasinda ulastiysak hic ateslemeden cik
+        if (CurrentTranscends or 0) >= (Config["Max Rebirths"] or 0) then
+            break
+        end
+
         local TargetRebirth = (DataInventory.TapHeroes.Rebirths or 0) + 1
         StatusUpdate("Transcend/Rebirth aksiyonu -> hedef rebirth: " .. tostring(TargetRebirth)
-            .. " | Transcend: " .. tostring(DataInventory.TapHeroes.Transcends or 0)
+            .. " | Transcend: " .. tostring(CurrentTranscends or 0)
             .. "/" .. tostring(Config["Max Rebirths"] or 0))
         repeat
+            -- Hedefe ulastiysak fazladan atma
+            if (CurrentTranscends or 0) >= (Config["Max Rebirths"] or 0) then
+                break
+            end
             -- Eski rebirth stilinde direkt remote (dump'ta TX_Post olarak tespit edildi).
             Network.Fire("Instancing_FireCustomFromClient","TapHeroes",TranscendRemote)
             task.wait(0.5)
