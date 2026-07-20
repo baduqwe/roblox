@@ -34,9 +34,6 @@ until player:GetAttribute("__LOADED")
 local SetLevelRemote = nil
 local RebirthRemote = nil
 local MoveRemote = nil
--- Tap Heroes transcend/rebirth aksiyon remote'u. Eski kalipla dinamik bulunamadigi
--- icin sabit yaziyoruz (dump'ta TX_Post olarak tespit edildi). Oyun guncellenip
--- remote adi degisirse SADECE burayi guncelle.
 local TranscendRemote = "TX_Post"
 
 local InstancingCmds2 = require(game:GetService("ReplicatedStorage").Library.Client.InstancingCmds)
@@ -75,10 +72,6 @@ repeat
     end
     
     task.wait(2)
-    
-    -- (Transcend/rebirth butonuna basma kaldirildi: eskiden RebirthRemote'u
-    --  kesfetmek icindi; artik aksiyonu asagida butonla atesledigimiz icin
-    --  gereksiz ve baslangicta yanlislikla aksiyon attirabilir.)
     for _, obj in ipairs(getgc()) do
         if type(obj) == "function" then
             local source = debug.info(obj, "s")
@@ -164,17 +157,11 @@ local startTime = os.clock()
 local StartEggs = DataInventory.EggsHatched or 0
 local lastEquip = 0
 local keys = {}
-
--- Envanter sayaci (PlazaPlus'taki GetItemAmount ile ayni yontem):
--- GetItem("Lootbox", ...) yanlis sinifa bakip 0 donebiliyordu. Bunun yerine
--- envanterin TAMAMINI gezip id'si eslesen her yiginin "_am" adedini topluyoruz.
 local InventoryCmds
 do
-    -- 1) Bilinen yol (dump'ta dogrulandi)
     pcall(function()
         InventoryCmds = require(game:GetService("ReplicatedStorage").Library.Client.InventoryCmds)
     end)
-    -- 2) Tutmazsa isimle ara (dumper'da ise yarayan yontem)
     if not (type(InventoryCmds) == "table" and InventoryCmds.State) then
         InventoryCmds = nil
         local lib = game:GetService("ReplicatedStorage"):FindFirstChild("Library")
@@ -212,9 +199,6 @@ local function GetItemAmount(TargetId)
     if not ok then return nil end
     return Total
 end
-
--- Obsidian Gift: ana sayi = hesaptaki mevcut adet, yanindaki = saatlik farm hizi.
--- Hiz icin sadece ARTISLARI topluyoruz (acilinca dusen sayiyi farm sayma).
 local LastGiftCount = GetItemAmount("Obsidian Gift") or 0
 local TotalGiftsFarmed = 0
 print("[GIFT] Baslangic Obsidian Gift =", LastGiftCount)
@@ -226,7 +210,6 @@ task.spawn(function()
         TimeEclapsedStat:Update(tostring(utils:FormatTime(now - startTime)))
         TotalEggsOpened:Update(utils:FormatNumber((DataInventory.EggsHatched or 0) - StartEggs))
 
-        -- Obsidian Gift: mevcut adedi oku, artislari da hiz icin biriktir
         local curGifts = GetItemAmount("Obsidian Gift")
         if curGifts then
             if curGifts > LastGiftCount then
@@ -2376,10 +2359,6 @@ local OldMax = DataInventory.TapHeroes.MaxZone or 1
 
 local BossActive = false
 local BossDespawnTime = 0
-
--- Transcend sayaci: state paketinin [13]. arg'indan DOGRUDAN okunur.
--- Bilerek DataInventory'ye guvenmiyoruz (UpdatePlayerData bilinmeyen anahtari
--- kaydetmeyebiliyor -> nil okunup dongu hic durmuyordu).
 local CurrentTranscends = 0
 
 Network.Fired("Instancing_FireCustomFromServer"):Connect(function(
@@ -2453,12 +2432,6 @@ Network.Invoke("Instancing_InvokeCustomFromClient","TapHeroes",MoveRemote)
 SetLevel()
 TeleportPlayer(Vector3.new(59988, 1007, 60601))
 
-
--- === TRANSCEND KILIDI + IZLEYICI ===
--- Hedefe ulasildiysa TranscendRemote giden HER istegi bloklar (kim cagirirsa cagirsin),
--- ayrica cagrildigi her seferde kimin cagirdigini (traceback) yazar.
--- Eger transcend olurken hicbir [TX-*] logu cikmiyorsa -> tetikleyen client degil,
--- sunucu tarafi otomatik (o zaman Max Area'yi dusurmek gerekir).
 do
     pcall(function() if setreadonly then setreadonly(Network, false) end end)
 
@@ -2577,7 +2550,6 @@ if (CurrentTranscends or 0) < (Config["Max Rebirths"] or 0) then
         until ((DataInventory.TapHeroes.MaxZone or 1) >= 120 and DataInventory.TapHeroes.canRebirth)
             or (CurrentTranscends or 0) >= (Config["Max Rebirths"] or 0)
 
-        -- Hedefe grind sirasinda ulastiysak hic ateslemeden cik
         if (CurrentTranscends or 0) >= (Config["Max Rebirths"] or 0) then
             break
         end
@@ -2587,11 +2559,9 @@ if (CurrentTranscends or 0) < (Config["Max Rebirths"] or 0) then
             .. " | Transcend: " .. tostring(CurrentTranscends or 0)
             .. "/" .. tostring(Config["Max Rebirths"] or 0))
         repeat
-            -- Hedefe ulastiysak fazladan atma
             if (CurrentTranscends or 0) >= (Config["Max Rebirths"] or 0) then
                 break
             end
-            -- Eski rebirth stilinde direkt remote (dump'ta TX_Post olarak tespit edildi).
             Network.Fire("Instancing_FireCustomFromClient","TapHeroes",TranscendRemote)
             task.wait(0.5)
         until (DataInventory.TapHeroes.Rebirths or 0) >= TargetRebirth
