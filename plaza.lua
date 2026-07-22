@@ -973,18 +973,44 @@ local function SniperNotification(CurrentInfo, FindInfo, Percent)
 	})
 end
 
-local function GetTotalHuges()
-    local Total = 0
+local function GetHugeStats()
+    local Stats = {
+        Total = 0,
+        Normal = 0,
+        Golden = 0,
+        Rainbow = 0,
+        Shiny = 0,
+        ShinyGolden = 0,
+        ShinyRainbow = 0,
+    }
     local Inventory = GetInventoryByClass("Pet")
     if not Inventory or not Inventory._byUID then
-        return 0
+        return Stats
     end
     for _, ItemTable in pairs(Inventory._byUID) do
         if ItemTable.IsHuge and ItemTable:IsHuge() then
-            Total = Total + (ItemTable._data and ItemTable._data["_am"] or 1)
+            local Amount = ItemTable._data and ItemTable._data["_am"] or 1
+            local IsShiny = ItemTable.IsShiny and ItemTable:IsShiny() or false
+            local IsGolden = ItemTable.IsGolden and ItemTable:IsGolden() or false
+            local IsRainbow = ItemTable.IsRainbow and ItemTable:IsRainbow() or false
+
+            Stats.Total = Stats.Total + Amount
+            if IsShiny and IsRainbow then
+                Stats.ShinyRainbow = Stats.ShinyRainbow + Amount
+            elseif IsShiny and IsGolden then
+                Stats.ShinyGolden = Stats.ShinyGolden + Amount
+            elseif IsShiny then
+                Stats.Shiny = Stats.Shiny + Amount
+            elseif IsRainbow then
+                Stats.Rainbow = Stats.Rainbow + Amount
+            elseif IsGolden then
+                Stats.Golden = Stats.Golden + Amount
+            else
+                Stats.Normal = Stats.Normal + Amount
+            end
         end
     end
-    return Total
+    return Stats
 end
 
 local function GetItemAmount(TargetId)
@@ -1004,12 +1030,15 @@ end
 
 local function SellerNotification(CurrentInfo)
     local BoothCount, ItemCount = FindItemsInBooth(CurrentInfo.ID, CurrentInfo.Class)
+    local HugeStats = GetHugeStats()
     local Description = {
         "**<:Box:1239350602413375591> Sold:** `"..CurrentInfo.Name.." x"..CurrentInfo.Amount.."`",
         "**<:Diamond:1235403834969296896> Gained:** `"..AddSuffix(CurrentInfo.Spent)..(CurrentInfo.Amount > 1 and " ("..AddSuffix(CurrentInfo.Spent / CurrentInfo.Amount).." per)`" or "`"),
         "**<:Booth:1239350605294604378> Booth Count:** `"..AddCommas(ItemCount).."`",
         "**<:Bank:1295944894698754102> Current Diamonds:** `"..AddSuffix(GetDiamonds()).."`",
-        "**<:Misc:1236020543082463253> Total Huges:** `"..AddCommas(GetTotalHuges()).."`",
+        "**<:Misc:1236020543082463253> Total Huges:** `"..AddCommas(HugeStats.Total).."`",
+        "**↳ Normal:** `"..AddCommas(HugeStats.Normal).."` | **Golden:** `"..AddCommas(HugeStats.Golden).."` | **Rainbow:** `"..AddCommas(HugeStats.Rainbow).."`",
+        "**↳ Shiny:** `"..AddCommas(HugeStats.Shiny).."` | **Shiny Golden:** `"..AddCommas(HugeStats.ShinyGolden).."` | **Shiny Rainbow:** `"..AddCommas(HugeStats.ShinyRainbow).."`",
         "**<:Misc:1236020543082463253> Total Gifts:** `"..AddCommas(GetItemAmount("Obsidian Gift")).."`",
         "**<:Misc:1236020543082463253> Total Mini Pinata:** `"..AddCommas(GetItemAmount("Mini Pinata")).."`",
         "**<:Misc:1236020543082463253> Total Insta Plant Capsule:** `"..AddCommas(GetItemAmount("Insta Plant Capsule")).."`",
