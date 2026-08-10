@@ -1039,11 +1039,11 @@ local function SellerNotification(CurrentInfo)
         "**<:Misc:1236020543082463253> Total Huges:** `"..AddCommas(HugeStats.Total).."`",
         "**↳ Normal:** `"..AddCommas(HugeStats.Normal).."` | **Golden:** `"..AddCommas(HugeStats.Golden).."` | **Rainbow:** `"..AddCommas(HugeStats.Rainbow).."`",
         "**↳ Shiny:** `"..AddCommas(HugeStats.Shiny).."` | **Shiny Golden:** `"..AddCommas(HugeStats.ShinyGolden).."` | **Shiny Rainbow:** `"..AddCommas(HugeStats.ShinyRainbow).."`",
-        "**<:Misc:1236020543082463253> Total Gifts:** `"..AddCommas(GetItemAmount("Obsidian Gift")).."`",
+        "**<:Misc:1236020543082463253> Total Gifts:** `"..AddCommas(GetItemAmount("Fiesta Gift")).."`",
         "**<:Misc:1236020543082463253> Total Mini Pinata:** `"..AddCommas(GetItemAmount("Mini Pinata")).."`",
         "**<:Misc:1236020543082463253> Total Insta Plant Capsule:** `"..AddCommas(GetItemAmount("Insta Plant Capsule")).."`",
         "**<:Misc:1236020543082463253> Total Rainbow Mini Chest:** `"..AddCommas(GetItemAmount("Rainbow Mini Chest")).."`",
-        "**<:Misc:1236020543082463253> Keys:** `C:"..AddCommas(GetItemAmount("Crystal Key")).." S:"..AddCommas(GetItemAmount("Secret Key")).." T:"..AddCommas(GetItemAmount("Tech Key")).." V:"..AddCommas(GetItemAmount("Void Key")).."`",
+        "**<:Misc:1236020543082463253> Keys:** `C:"..AddCommas(GetItemAmount("Crystal Key")).." S:"..AddCommas(GetItemAmount("Secret Key")).." T:"..AddCommas(GetItemAmount("Tech Key")).." V:"..AddCommas(GetItemAmount("Void Key")).." F:"..AddCommas(GetItemAmount("Fiesta Key")).."`",
     }
 
     local Message = {
